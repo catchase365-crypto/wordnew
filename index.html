@@ -124,7 +124,7 @@
         body.sepia-mode .category-tab { background: #fdfaf3; border: 1px solid #d3c4a9; color: #5b4636; }
         body.sepia-mode .category-tab.active { background: #8d6e63 !important; color: #fff !important; }
         body.sepia-mode .lightbox, body.sepia-mode .lightbox-inner { background: #f4ecd8 !important; }
-        body.sepia-mode .lightbox-close, body.sepia-mode .lightbox-counter, body.sepia-mode .lightbox-fs-btn, body.sepia-mode .lightbox-menu {
+        body.sepia-mode .lightbox-close, body.sepia-mode .lightbox-counter, body.sepia-mode .lightbox-fs-btn, body.sepia-mode .lightbox-trans-btn, body.sepia-mode .lightbox-menu {
             background: #fdfaf3; border: 1px solid #d3c4a9; color: #5b4636;
         }
         body.sepia-mode .menu-item {
@@ -181,8 +181,20 @@
         .theme-ink .zh-translation { color: #000; border-top-color: #000; }
         .theme-ink .def-item { background: #fff; border: 1px solid #eee; }
         .theme-ink .def-item div { color: #000 !important; }
+
+        /* 隐藏翻译功能样式 */
+        body.hide-translation .zh-translation, 
+        body.hide-translation .zh-def { 
+            visibility: hidden; 
+        }
+        /* 隐藏模式下点击或长按区域临时显示，方便自测查看 */
+        body.hide-translation .zh-translation:active, 
+        body.hide-translation .zh-def:active {
+            visibility: visible !important;
+            background: rgba(255, 255, 0, 0.2);
+        }
         body.ink-mode .lightbox, body.ink-mode .lightbox-inner { background: #fff !important; }
-        body.ink-mode .lightbox-close, body.ink-mode .lightbox-counter, body.ink-mode .lightbox-fs-btn, body.ink-mode .lightbox-menu {
+        body.ink-mode .lightbox-close, body.ink-mode .lightbox-counter, body.ink-mode .lightbox-fs-btn, body.ink-mode .lightbox-trans-btn, body.ink-mode .lightbox-menu {
             background: #fff; border: 2px solid #000; color: #000;
         }
 
@@ -296,7 +308,9 @@
             z-index: 2100; cursor: pointer; backdrop-filter: blur(5px);
         }
         .lightbox-counter { position: absolute; top: 8px; left: 8px; color: white; font-size: 12px; background: rgba(0,255,65,0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
-        .lightbox-fs-btn { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); color: white; font-size: 12px; background: rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
+        
+        .lightbox-loop-btn { position: absolute; top: 8px; right: 224px; color: white; font-size: 12px; background: rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
+        .lightbox-trans-btn { position: absolute; top: 8px; right: 80px; color: white; font-size: 12px; background: rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
         .lightbox-menu { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.98); border: 1px solid #00ff41; border-radius: 8px; max-height: 85vh; width: 96vw; max-width: 1000px; overflow-y: auto; display: none; z-index: 2300; padding: 12px; box-shadow: 0 0 30px rgba(0,255,65,0.5); grid-template-columns: repeat(3, 1fr); gap: 6px; touch-action: auto; }
         .menu-item { padding: 10px 4px; color: #00ff41; font-size: 11px; cursor: pointer; border: 1px solid rgba(0, 255, 65, 0.2); border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
         .menu-item:hover { background: rgba(0, 255, 65, 0.1); }
@@ -339,6 +353,7 @@
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleFullScreen()">⛶ 全屏</button>
         <button id="themeToggleBtn" class="icon-btn" style="flex: 1.5; min-width: 160px; justify-content: center;" onclick="toggleDarkLight()">🌓 切换深/浅</button>
         <button id="inkModeBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleInkMode()">📖 墨水屏</button>
+        <button id="hideTransBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleHideTranslation()">👁️ 隐藏中文</button>
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="forceSync()">🔄 同步</button>
     </div>
 
@@ -363,8 +378,9 @@
 <div id="resultsGrid" class="results-grid"></div>
 
 <div id="lightbox" class="lightbox" onclick="closeLightbox()">
-    <span class="lightbox-close">✕ 关闭</span>
-    <span class="lightbox-fs-btn" onclick="event.stopPropagation(); toggleFullScreen()">⛶ 全屏切换</span>
+    <span class="lightbox-close">✕</span>
+    <span class="lightbox-trans-btn" onclick="event.stopPropagation(); toggleHideTranslation()">👁️ 中文</span>
+    <span class="lightbox-loop-btn" id="loopBtn" onclick="event.stopPropagation(); toggleAutoLoop()">🎯</span>
 
     <div id="lightboxInner" class="lightbox-inner" onclick="event.stopPropagation()"></div>
     <div id="lightboxCounter" class="lightbox-counter"></div>
@@ -390,10 +406,11 @@ function toggleFullScreen() {
     const syncUI = () => {
         // 延迟执行以等待浏览器完成布局重绘和窗口尺寸更新
         setTimeout(() => {
+            window.scrollTo(0, 0);
             if (document.getElementById('lightbox').style.display === 'flex') {
                 updateLightboxContent();
             }
-        }, 150);
+        }, 350);
     };
 
     if (!isFull) {
@@ -434,6 +451,8 @@ let isAborted = false;
 let currentRenderId = 0;
 let currentGlobalTheme = localStorage.getItem('app_theme') || 'oled';
 let isInkMode = localStorage.getItem('is_ink_mode') === 'true';
+let isHideTranslation = localStorage.getItem('hide_translation') === 'true';
+let isAutoLoop = false;
 
 function populateVoiceList() {
     if (typeof speechSynthesis === 'undefined') return;
@@ -469,8 +488,22 @@ function speakTTS(text, event) {
     const selectedVoice = voices.find(v => v.voiceURI === voiceSelect.value);
     if (selectedVoice) u.voice = selectedVoice;
     u.lang = 'en-US';
-    u.rate = 0.9; // 稍慢一点更清晰
+    u.rate = 0.9;
+    u.onend = () => {
+        if (isAutoLoop) {
+            setTimeout(() => {
+                if (isAutoLoop) speakTTS(text);
+            }, 500);
+        }
+    };
     window.speechSynthesis.speak(u);
+}
+
+function toggleAutoLoop() {
+    isAutoLoop = !isAutoLoop;
+    const btn = document.getElementById('loopBtn');
+    btn.innerText = isAutoLoop ? '🔁' : '🎯';
+    if (!isAutoLoop) window.speechSynthesis.cancel();
 }
 
 const HighlighterColors = [
@@ -595,7 +628,7 @@ function createBaseCardDOM(data) {
         const cleanWord = item.word.replace(/'/g, "\\'");
         defHTML += `<div class="def-item" style="flex-direction: column; align-items: flex-start; cursor:pointer; transition: transform 0.2s;" onclick="speakTTS('${cleanWord}', event)" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <div style="margin-bottom: 2px;"><mark class="hl" style="background-color: ${color}; font-weight: 600; margin-right: 6px;">${item.word}</mark><span style="font-size: 12px; color: #888;">${item.phonetic || ''}</span></div>
-            <div style="color: #444;">${item.definition}</div>
+            <div class="zh-def" style="color: #444;">${item.definition}</div>
         </div>`;
     });
     botSec.innerHTML = defHTML;
@@ -718,6 +751,12 @@ async function toggleInkMode() {
     if (currentCategory) await renderCategory(currentCategory);
 }
 
+function toggleHideTranslation() {
+    isHideTranslation = !isHideTranslation;
+    localStorage.setItem('hide_translation', isHideTranslation);
+    applyThemeToBody();
+}
+
 function applyThemeToBody() {
     document.body.classList.remove('ink-mode', 'sepia-mode');
     const root = document.documentElement;
@@ -753,6 +792,14 @@ function applyThemeToBody() {
         document.body.classList.add('ink-mode');
     } else if (currentGlobalTheme === 'sepia') {
         document.body.classList.add('sepia-mode');
+    }
+
+    if (isHideTranslation) {
+        document.body.classList.add('hide-translation');
+        document.getElementById('hideTransBtn').innerText = '👁️ 显示中文';
+    } else {
+        document.body.classList.remove('hide-translation');
+        document.getElementById('hideTransBtn').innerText = '👁️ 隐藏中文';
     }
     
     const btn = document.getElementById('themeToggleBtn');
@@ -897,8 +944,8 @@ function openLightbox(index) {
 async function updateLightboxContent() {
     const inner = document.getElementById('lightboxInner');
     // 使用 clientWidth/Height 排除滚动条干扰，确保 GitHub 与本地计算一致
-    const winW = document.documentElement.clientWidth;
-    const winH = document.documentElement.clientHeight;
+    const winW = window.innerWidth;
+    const winH = window.innerHeight;
     const winRatio = winW / winH;
     const cardW = isInkMode ? 750 : 500;
     const cardH = isInkMode ? 1000 : 1083;
@@ -912,7 +959,11 @@ async function updateLightboxContent() {
 
     const gap = 0;
     const totalCardWidth = cardsPerView * cardW;
-    const finalScale = Math.min(winW / totalCardWidth, winH / cardH);
+    let finalScale = Math.min(winW / totalCardWidth, winH / cardH);
+    // 确保在高度受限时，缩放比例能让卡片尽可能填满垂直空间
+    if (winH / cardH < winW / totalCardWidth) {
+        finalScale = winH / cardH;
+    }
 
     // 批量触发当前组的懒加载
     const indices = [];
@@ -939,9 +990,12 @@ async function updateLightboxContent() {
 
             const displayNode = domNode.cloneNode(true);
             displayNode.style.transform = `scale(${finalScale})`;
-            displayNode.style.transformOrigin = 'center center';
+            displayNode.style.transformOrigin = 'center top';
             displayNode.style.flexShrink = '0';
             displayNode.style.margin = '0';
+            // 修正全屏下位置偏移，确保顶端对齐
+            wrapper.style.alignItems = 'flex-start';
+            wrapper.style.paddingTop = '0';
             
             wrapper.appendChild(displayNode);
             inner.appendChild(wrapper);
