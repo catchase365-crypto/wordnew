@@ -314,6 +314,7 @@
         .lightbox-pen-btn.active { background: #00ff41; color: #000; }
         .drawing-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2050; pointer-events: none; touch-action: none; }
         .lightbox-trans-btn { position: absolute; top: 8px; right: 80px; color: white; font-size: 12px; background: rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
+        .lightbox-fs-btn { position: absolute; top: 8px; right: 530px; color: white; font-size: 12px; background: rgba(0, 255, 65, 0.2); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; cursor: pointer; backdrop-filter: blur(5px); }
         .lightbox-menu { position: absolute; top: 45px; left: 50%; transform: translateX(-50%); background: rgba(0, 0, 0, 0.98); border: 1px solid #00ff41; border-radius: 8px; max-height: 85vh; width: 96vw; max-width: 1000px; overflow-y: auto; display: none; z-index: 2300; padding: 12px; box-shadow: 0 0 30px rgba(0,255,65,0.5); grid-template-columns: repeat(3, 1fr); gap: 6px; touch-action: auto; }
         .tablet-only { display: none !important; }
         @media (min-width: 768px) { .tablet-only { display: flex !important; } }
@@ -393,6 +394,7 @@
     <span class="lightbox-close" onclick="closeLightbox()">✕</span>
     <span class="lightbox-trans-btn" onclick="event.stopPropagation(); toggleHideTranslation()">👁️ 中文</span>
     <span class="lightbox-loop-btn" id="loopBtn" onclick="event.stopPropagation(); toggleAutoLoop()">🎯</span>
+    <span class="lightbox-fs-btn tablet-only" onclick="event.stopPropagation(); toggleFullScreen()">⛶ 全屏</span>
     <div class="tablet-only pen-controls-top" id="penControls">
         <input type="range" id="penWeight" min="1" max="20" value="3" oninput="currentPenWeight = this.value" title="笔触粗细" style="margin-right: 5px;">
         <div class="color-dot" style="background: #00ff41; width: 18px; height: 18px; margin-right: 3px;" onclick="setPenColor('#00ff41', this)"></div>
