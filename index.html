@@ -368,6 +368,7 @@
         <button id="inkModeBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleInkMode()">📖 墨水屏</button>
         <button id="hideTransBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleHideTranslation()">👁️ 隐藏中文</button>
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="forceSync()">🔄 同步</button>
+        <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center; background: #e91e63 !important; color: white !important; border-color: #ff4081;" onclick="startRandomMode()">🎲 随机挑战</button>
     </div>
 
     <div style="margin-bottom: 12px;">
@@ -524,6 +525,16 @@ function speakTTS(text, event) {
         }
     };
     window.speechSynthesis.speak(u);
+}
+
+async function startRandomMode() {
+    if (!allImportedData || allImportedData.length === 0) return alert("数据正在加载，请稍候...");
+    currentCategory = 'Random';
+    // 随机洗牌全量数据
+    rawResultsData = [...allImportedData].sort(() => Math.random() - 0.5);
+    generatedImagesData = new Array(rawResultsData.length).fill(null);
+    generatedDOMs = new Array(rawResultsData.length).fill(null);
+    openLightbox(0);
 }
 
 function toggleAutoLoop() {
@@ -1122,8 +1133,16 @@ async function updateLightboxContent() {
     const counter = document.getElementById('lightboxCounter');
     const startIdx = currentGalleryIndex + 1;
     const endIdx = Math.min(currentGalleryIndex + cardsPerView, rawResultsData.length);
-    counter.innerText = (startIdx === endIdx ? startIdx : `${startIdx}-${endIdx}`) + ` / ${rawResultsData.length} ☰`;
-    counter.onclick = (e) => { e.stopPropagation(); toggleLightboxMenu(); };
+    
+    if (currentCategory === 'Random') {
+        counter.innerText = `🎲 随机模式 [${startIdx === endIdx ? startIdx : `${startIdx}-${endIdx}`}]`;
+        counter.onclick = null;
+        counter.style.cursor = 'default';
+    } else {
+        counter.innerText = (startIdx === endIdx ? startIdx : `${startIdx}-${endIdx}`) + ` / ${rawResultsData.length} ☰`;
+        counter.onclick = (e) => { e.stopPropagation(); toggleLightboxMenu(); };
+        counter.style.cursor = 'pointer';
+    }
 }
 
 function toggleLightboxMenu() {
