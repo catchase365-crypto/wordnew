@@ -139,48 +139,25 @@
         .theme-sepia .def-item { background: rgba(141, 110, 99, 0.1); }
         .theme-sepia .def-item div { color: #5b4636 !important; }
 
-        /* 墨水屏模式 (E-Ink) */
-        body.ink-mode {
-            --card-w: 750px;
-            --card-h: 1000px;
-            background: #ffffff !important;
-            color: #000000 !important;
-        }
-        body.ink-mode .config-panel {
-            background: #ffffff;
-            border: 2px solid #000;
-            box-shadow: none;
-            color: #000;
-        }
+                /* 墨水屏模式 (E-Ink) 专属样式全面强制覆盖 */
+        body.ink-mode { --card-w: 750px; --card-h: 1000px; background: #ffffff !important; color: #000000 !important; }
+        body.ink-mode .config-panel { background: #ffffff; border: 2px solid #000; box-shadow: none; color: #000; }
         body.ink-mode .config-panel h3, body.ink-mode .tips { color: #000; }
-        body.ink-mode button, body.ink-mode .icon-btn {
-            background: #fff !important;
-            color: #000 !important;
-            border: 2px solid #000 !important;
-        }
-        body.ink-mode input, body.ink-mode textarea {
-            background: #fff;
-            color: #000;
-            border: 2px solid #000;
-        }
-        body.ink-mode .category-tab {
-            background: #fff;
-            border: 2px solid #000;
-            color: #000;
-        }
-        body.ink-mode .category-tab.active {
-            background: #000 !important;
-            color: #fff !important;
-        }
-        .theme-ink { --card-bg: #ffffff; --text-color: #000000; --border-color: #000000; --accent: #000000; --bg-img: none; }
+        body.ink-mode button, body.ink-mode .icon-btn { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; }
+        body.ink-mode input, body.ink-mode textarea { background: #fff; color: #000; border: 2px solid #000; }
+        body.ink-mode .category-tab { background: #fff; border: 2px solid #000; color: #000; }
+        body.ink-mode .category-tab.active { background: #000 !important; color: #fff !important; }
+
+        .theme-ink { --card-bg: #ffffff; --text-color: #000000; --border-color: #000000; --accent: #000000; --bg-img: none; --app-bg: #ffffff; --app-text: #000000; --app-border: #000000; --app-accent: #000000; }
         .theme-ink .top-section, .theme-ink .bottom-section, .theme-ink .center-word, .theme-ink .word-item, .theme-ink .header-box {
-            background: #fff !important;
-            color: #000 !important;
-            border: 2px solid #000 !important;
+            background: #ffffff !important; color: #000000 !important; border: 2px solid #000000 !important; box-shadow: none !important;
         }
-        .theme-ink .zh-translation { color: #000; border-top-color: #000; }
-        .theme-ink .def-item { background: #fff; border: 1px solid #eee; }
-        .theme-ink .def-item div { color: #000 !important; }
+        .theme-ink .word-item { color: #000000 !important; }
+        .theme-ink mark.hl { background-color: #e5e5e5 !important; color: #000000 !important; border: 1px solid #000000 !important; box-shadow: none !important; }
+        .theme-ink .line { background-color: #000000 !important; height: 2px !important; }
+        .theme-ink .zh-translation { color: #000000 !important; border-top-color: #000000 !important; }
+        .theme-ink .def-item { background: #ffffff !important; border: 1px solid #000000 !important; }
+        .theme-ink .def-item div { color: #000000 !important; }
 
         /* 隐藏翻译功能样式 */
         body.hide-translation .zh-translation, 
@@ -482,6 +459,21 @@ let isDrawing = false;
 let currentPenColor = '#00ff41';
 let currentPenWeight = 3;
 
+// 核心修复：利用隐藏 iframe 唤醒欧路词典，完美保持全屏状态
+window.callEudic = function(word) {
+    if (!word) return;
+    const url = `eudic://dict/${encodeURIComponent(word)}`;
+    
+    let iframe = document.getElementById('eudic-trigger-iframe');
+    if (!iframe) {
+        iframe = document.createElement('iframe');
+        iframe.id = 'eudic-trigger-iframe';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+    }
+    iframe.src = url;
+};
+
 function populateVoiceList() {
     if (typeof speechSynthesis === 'undefined') return;
     const voices = speechSynthesis.getVoices();
@@ -618,7 +610,7 @@ function abortGeneration() {
 
 function createBaseCardDOM(data) {
     const card = document.createElement('div');
-    const theme = currentGlobalTheme;
+    const theme = isInkMode ? 'ink' : currentGlobalTheme;
     card.className = `card-container theme-${theme}`;
 
     const topSec = document.createElement('div');
@@ -664,7 +656,7 @@ function createBaseCardDOM(data) {
     data.words.forEach((item, i) => {
         const color = HighlighterColors[i % HighlighterColors.length];
         const cleanWord = item.word.replace(/'/g, "\\'");
-        defHTML += `<div class="def-item" style="flex-direction: column; align-items: flex-start; cursor:pointer; transition: transform 0.2s;" onclick="speakTTS('${cleanWord}', event)" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        defHTML += `<div class="def-item" data-word="${cleanWord}" style="flex-direction: column; align-items: flex-start; cursor:pointer; transition: transform 0.2s;" onclick="speakTTS('${cleanWord}', event)" oncontextmenu="window.callEudic('${cleanWord}'); return false;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <div style="margin-bottom: 2px;"><mark class="hl" style="background-color: ${color}; font-weight: 600; margin-right: 6px;">${item.word}</mark><span style="font-size: 12px; color: #888;">${item.phonetic || ''}</span></div>
             <div class="zh-def" style="color: #444;">${item.definition}</div>
         </div>`;
@@ -739,10 +731,15 @@ function drawDynamicTree(cardDOM, data) {
         const y = centerY + Math.sin(angleRad) * radius;
 
         const el = document.createElement('div');
+        const cleanWordAttr = item.word.replace(/'/g, "\\'");
         el.className = 'word-item';
         el.style.backgroundColor = color; 
         el.style.cursor = 'pointer';
-        el.setAttribute('onclick', `speakTTS('${item.word.replace(/'/g, "\\'")}', event)`);
+        el.setAttribute('data-word', cleanWordAttr);
+        el.setAttribute('onclick', `speakTTS('${cleanWordAttr}', event)`);
+        el.setAttribute('oncontextmenu', `window.callEudic('${cleanWordAttr}'); return false;`);
+        el.style.userSelect = 'none'; 
+        el.style.webkitUserSelect = 'none';
         el.innerText = item.word;
         
         const cos = Math.cos(angleRad);
@@ -798,7 +795,7 @@ function toggleHideTranslation() {
 function applyThemeToBody() {
     document.body.classList.remove('ink-mode', 'sepia-mode');
     const root = document.documentElement;
-    const themeClass = `theme-${currentGlobalTheme}`;
+    const themeClass = isInkMode ? 'theme-ink' : `theme-${currentGlobalTheme}`;
     
     const tempDiv = document.createElement('div');
     tempDiv.className = themeClass;
@@ -1011,13 +1008,21 @@ function initDrawingCanvas() {
     canvas.height = window.innerHeight;
     drawingCtx = canvas.getContext('2d');
     
+    // 引入独立的手指长按/短按状态跟踪器
+    let fingerTimer = null;
+    let isLongPressTriggered = false;
+    let startX = 0;
+    let startY = 0;
+    let targetElement = null;
+
     const getLineWidth = (p) => {
         const pressure = (p > 0) ? p : 0.5;
         return pressure * (currentPenWeight * 2) + 1;
     };
 
+    // 1. 按下事件监听
     canvas.onpointerdown = (e) => {
-        // 仅允许电磁笔 (如 S-Pen) 书写
+        // 【电磁笔模式】仅允许 S-Pen 书写批注
         if (isPenMode && e.pointerType === 'pen') {
             isDrawing = true;
             drawingCtx.beginPath();
@@ -1028,14 +1033,36 @@ function initDrawingCanvas() {
             drawingCtx.lineCap = 'round';
             e.preventDefault();
             e.stopPropagation();
-        } else if (isPenMode) {
-            // 如果是手指点击，通过坐标获取下方元素并触发点击，实现点读功能穿透
+        } 
+        // 【手指触摸模式】处理点读与长按穿透
+        else if (isPenMode) {
+            isLongPressTriggered = false;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            // 瞬间穿透画布获取底层的真实单词 DOM 节点
             canvas.style.pointerEvents = 'none';
-            const target = document.elementFromPoint(e.clientX, e.clientY);
-            if (target) target.click();
+            targetElement = document.elementFromPoint(e.clientX, e.clientY);
             canvas.style.pointerEvents = 'auto';
+
+            if (targetElement) {
+                // 开启 500ms 纯净长按判定定时器
+                fingerTimer = setTimeout(() => {
+                    isLongPressTriggered = true;
+                    // 使用 closest 确保点到释义块内部的音标或中文时，也能精准向上抓取到绑定的单词
+                    const wordNode = targetElement.closest('[data-word]');
+                    const word = wordNode ? wordNode.getAttribute('data-word') : null;
+                    if (word && window.callEudic) {
+                        window.callEudic(word); // 唤醒欧路
+                    }
+                }, 500);
+            }
+            e.preventDefault();
+            e.stopPropagation();
         }
     };
+
+    // 2. 移动事件监听（加入防抖容错）
     canvas.onpointermove = (e) => {
         if (isDrawing && e.pointerType === 'pen') {
             drawingCtx.lineTo(e.clientX, e.clientY);
@@ -1045,10 +1072,47 @@ function initDrawingCanvas() {
             drawingCtx.moveTo(e.clientX, e.clientY);
             e.preventDefault();
             e.stopPropagation();
+        } 
+        // 手指在长按过程中如果发生大幅度拖拽，则取消长按（允许 12 像素内的肉肉手微小抖动）
+        else if (isPenMode && fingerTimer) {
+            const moveX = Math.abs(e.clientX - startX);
+            const moveY = Math.abs(e.clientY - startY);
+            if (moveX > 12 || moveY > 12) {
+                clearTimeout(fingerTimer);
+                fingerTimer = null;
+            }
         }
     };
-    canvas.onpointerup = () => { isDrawing = false; drawingCtx.beginPath(); };
-    canvas.onpointercancel = () => { isDrawing = false; };
+
+    // 3. 抬起事件监听（核心时序控制）
+    canvas.onpointerup = (e) => {
+        if (e.pointerType === 'pen') {
+            isDrawing = false;
+            drawingCtx.beginPath();
+        } else if (isPenMode) {
+            // 手指抬起时，立刻掐断定时器
+            if (fingerTimer) {
+                clearTimeout(fingerTimer);
+                fingerTimer = null;
+            }
+            
+            // 重要：只有在 500ms 内抬起、且从未触发过长按弹窗时，才判定为“普通短按”
+            if (!isLongPressTriggered && targetElement) {
+                targetElement.click(); // 触发底层的 TTS 朗读发音
+            }
+            targetElement = null;
+        }
+    };
+
+    // 4. 异常中断处理
+    canvas.onpointercancel = () => {
+        isDrawing = false;
+        if (fingerTimer) {
+            clearTimeout(fingerTimer);
+            fingerTimer = null;
+        }
+        targetElement = null;
+    };
 }
 
 async function updateLightboxContent() {
