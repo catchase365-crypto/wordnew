@@ -1310,14 +1310,7 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-const lb = document.getElementById('lightbox');
-lb.addEventListener('touchstart', e => { touchStartX = e.changedTouches[0].screenX; }, false);
-lb.addEventListener('touchend', e => {
-    if (isPenMode) return; // 🖌️ 批注模式下禁用滑动翻页，防止误触
-    let touchEndX = e.changedTouches[0].screenX;
-    if (touchStartX - touchEndX > 50) nextImage();
-    if (touchEndX - touchStartX > 50) prevImage();
-}, false);
+// 已移除基于手势的左右滑动翻页功能，防止移动端误触。
 
 function downloadAllData() {
     const validData = rawResultsData.filter(item => item !== null);
