@@ -162,6 +162,13 @@
         .theme-ink .def-item { background: #ffffff !important; border: 1px solid #000000 !important; }
         .theme-ink .def-item div { color: #000000 !important; }
 
+        /* 核心适配：禁用苹果 iOS 长按弹出系统选择蓝块、拷贝菜单与放大镜 */
+        [data-word], .word-item, .def-item, mark.hl {
+            -webkit-touch-callout: none !important;
+            -webkit-user-select: none !important;
+            user-select: none !important;
+        }
+
         /* 隐藏翻译功能样式 */
         body.hide-translation .zh-translation, 
         body.hide-translation .zh-def { 
@@ -464,19 +471,30 @@ let isDrawing = false;
 let currentPenColor = '#00ff41';
 let currentPenWeight = 3;
 
-// 核心修复：利用隐藏 iframe 唤醒欧路词典，完美保持全屏状态
+// 升级版跨平台唤端引擎：完美适配 iOS 独立 App 安全策略
 window.callEudic = function(word) {
     if (!word) return;
     const url = `eudic://dict/${encodeURIComponent(word)}`;
     
-    let iframe = document.getElementById('eudic-trigger-iframe');
-    if (!iframe) {
-        iframe = document.createElement('iframe');
-        iframe.id = 'eudic-trigger-iframe';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
+    // 精准判定当前设备是否为苹果设备（iPhone / iPad）
+    const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+                    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    
+    if (isApple) {
+        // 苹果系统特殊处理：隐藏 iframe 挂载会被静默拦截，必须改用 location.href 直调。
+        // 在 iOS PWA 独立主屏幕模式下，这不会导致退出全屏，只会唤醒欧路。
+        window.location.href = url;
+    } else {
+        // 安卓系统保持原样：使用隐式 iframe 完美规避 Chrome 退出全屏的 Bug
+        let iframe = document.getElementById('eudic-trigger-iframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'eudic-trigger-iframe';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+        }
+        iframe.src = url;
     }
-    iframe.src = url;
 };
 
 function populateVoiceList() {
@@ -1327,6 +1345,58 @@ function downloadAllData() {
     const blob = new Blob([jsonlContent], { type: "application/octet-stream" });
     saveAs(blob, "单词卡片纯文本数据.jsonl");
 }
+
+// 专门解决 iOS/iPadOS 正常浏览模式下长按不触发 oncontextmenu 导致无法弹窗的底层手势补丁
+document.addEventListener('DOMContentLoaded', () => {
+    let globalFingerTimer = null;
+    let globalLongPressActive = false;
+    let gStartX = 0, gStartY = 0;
+    let gTargetElement = null;
+
+    const lbInner = document.getElementById('lightboxInner');
+    if (!lbInner) return;
+
+    lbInner.addEventListener('touchstart', (e) => {
+        if (isPenMode) return; 
+        
+        gTargetElement = e.target.closest('[data-word]');
+        if (!gTargetElement) return;
+        
+        globalLongPressActive = false;
+        gStartX = e.touches[0].clientX;
+        gStartY = e.touches[0].clientY;
+        
+        globalFingerTimer = setTimeout(() => {
+            globalLongPressActive = true;
+            const word = gTargetElement.getAttribute('data-word');
+            if (word && window.callEudic) {
+                window.callEudic(word);
+            }
+        }, 500);
+    }, { passive: true });
+
+    lbInner.addEventListener('touchmove', (e) => {
+        if (isPenMode || !globalFingerTimer) return;
+        const moveX = Math.abs(e.touches[0].clientX - gStartX);
+        const moveY = Math.abs(e.touches[0].clientY - gStartY);
+        if (moveX > 12 || moveY > 12) {
+            clearTimeout(globalFingerTimer);
+            globalFingerTimer = null;
+        }
+    }, { passive: true });
+
+    lbInner.addEventListener('touchend', (e) => {
+        if (isPenMode) return;
+        if (globalFingerTimer) {
+            clearTimeout(globalFingerTimer);
+            globalFingerTimer = null;
+        }
+        if (globalLongPressActive) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+    }, { passive: false });
+});
 
 async function downloadAllImages() {
     const validImages = generatedImagesData.filter(item => item !== null);
