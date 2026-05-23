@@ -342,6 +342,41 @@
         body.is-pseudo-fullscreen .top-bar {
             padding-top: env(safe-area-inset-top);
         }
+
+        /* --- 双语句子级同步聚焦高亮样式 --- */
+        .en-paragraph, .zh-translation {
+            transition: all 0.3s ease;
+        }
+        /* 当开启句子聚焦时，让卡片内其余未被高亮的句子自动变淡，产生完美的“非破坏性”舞台聚焦效果 */
+        .card-container.has-focus .tts-sentence:not(.active-focus),
+        .card-container.has-focus .zh-sentence:not(.active-focus) {
+            opacity: 0.3;
+        }
+        .tts-sentence, .zh-sentence {
+            transition: all 0.25s ease;
+            border-radius: 4px;
+            padding: 0 2px;
+            display: inline;
+        }
+        /* OLED绿模式下的句子高亮：半透明荧光绿底 + 白字加外发光 */
+        .theme-oled .active-focus {
+            background-color: rgba(0, 255, 65, 0.25) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
+            opacity: 1 !important;
+        }
+        /* 棕褐阅读模式下的句子高亮：柔和深啡色底 */
+        .theme-sepia .active-focus {
+            background-color: rgba(141, 110, 99, 0.25) !important;
+            color: #5b4636 !important;
+            opacity: 1 !important;
+        }
+        /* 墨水屏模式下的句子高亮：反色为纯黑底白字，确保极高对比度 */
+        .theme-ink .active-focus {
+            background-color: #000000 !important;
+            color: #ffffff !important;
+            opacity: 1 !important;
+        }
     </style>
 </head>
 <body>
@@ -470,6 +505,7 @@ let drawingCtx = null;
 let isDrawing = false;
 let currentPenColor = '#00ff41';
 let currentPenWeight = 3;
+let currentSpeechId = 0; // 核心修复：全局双语朗读版本追踪计数器
 
 // 升级版跨平台唤端引擎：完美适配 iOS 独立 App 安全策略
 window.callEudic = function(word) {
@@ -521,10 +557,33 @@ function saveVoicePreference() {
     localStorage.setItem('app_tts_voice', voiceSelect.value);
 }
 
-function speakTTS(text, event) {
+function speakTTS(text, event, sIdx, btnEl) {
     if(event) event.stopPropagation();
     if(!text) return;
+    
+    // 核心修复：生成本次朗读的专属票据 ID，用来废弃之前未完成的异步回调
+    const mySpeechId = ++currentSpeechId; 
+    
     window.speechSynthesis.cancel();
+
+    // 1. 全局重置所有卡片的聚焦状态，防止样式残留
+    document.querySelectorAll('.card-container').forEach(c => {
+        c.classList.remove('has-focus');
+        c.querySelectorAll('.active-focus').forEach(el => el.classList.remove('active-focus'));
+    });
+
+    // 2. 如果传入了句子索引（说明是点击了句子，而非单个单词），开启舞台聚焦
+    let currentCard = null;
+    if (sIdx !== undefined && btnEl) {
+        currentCard = btnEl.closest('.card-container');
+        if (currentCard) {
+            currentCard.classList.add('has-focus');
+            // 同时捞出当前卡片里对应索引的英文 span 和中文 span 赋予高亮
+            currentCard.querySelectorAll(`.tts-sentence[data-index="${sIdx}"], .zh-sentence[data-index="${sIdx}"]`)
+                       .forEach(el => el.classList.add('active-focus'));
+        }
+    }
+
     const u = new SpeechSynthesisUtterance(text);
     const voiceSelect = document.getElementById('voiceSelect');
     const voices = speechSynthesis.getVoices();
@@ -532,13 +591,34 @@ function speakTTS(text, event) {
     if (selectedVoice) u.voice = selectedVoice;
     u.lang = 'en-US';
     u.rate = 0.9;
+    
+    // 3. 朗读完毕后，只有当 mySpeechId 等于最新的 currentSpeechId 时才释放状态
     u.onend = () => {
+        // 重要判定：如果本句子在中途被新点击无情打断，直接告退，绝不清理新句子的样式！
+        if (mySpeechId !== currentSpeechId) return; 
+        
+        if (currentCard) {
+            currentCard.classList.remove('has-focus');
+            currentCard.querySelectorAll('.active-focus').forEach(el => el.classList.remove('active-focus'));
+        }
         if (isAutoLoop) {
             setTimeout(() => {
-                if (isAutoLoop) speakTTS(text);
+                if (isAutoLoop && mySpeechId === currentSpeechId) speakTTS(text, null, sIdx, btnEl);
             }, 500);
         }
     };
+
+    // 4. 异常与打断事件保护
+    u.onerror = () => {
+        // 核心修复：如果是因打断触发了 error 事件，直接忽略，不准擦除新句子的绿色高亮
+        if (mySpeechId !== currentSpeechId) return; 
+        
+        if (currentCard) {
+            currentCard.classList.remove('has-focus');
+            currentCard.querySelectorAll('.active-focus').forEach(el => el.classList.remove('active-focus'));
+        }
+    };
+
     window.speechSynthesis.speak(u);
 }
 
@@ -649,7 +729,9 @@ function createBaseCardDOM(data) {
     const combinedRegex = new RegExp(`\\b(${escapedWords.join('|')})\\b`, 'gi');
 
     // 3. 将英文段落按句子切分，外层包裹发音 span，内部进行单词高亮！
-    const currentHighlightedEn = data.paragraph_en.replace(/[^.?!]+[.?!]*/g, (sentence) => {
+    const enSentences = data.paragraph_en.match(/[^.?!]+[.?!]*/g) || [data.paragraph_en];
+    let enHTML = '';
+    enSentences.forEach((sentence, idx) => {
         const highlightedSentence = sentence.replace(combinedRegex, (match) => {
             const lowerMatch = match.toLowerCase();
             const foundWord = sortedWords.find(w => lowerMatch === w.word.toLowerCase());
@@ -660,12 +742,19 @@ function createBaseCardDOM(data) {
             return match;
         });
         const cleanText = sentence.replace(/'/g, "\\'").replace(/"/g, "&quot;").trim();
-        return `<span class="tts-sentence" onclick="speakTTS('${cleanText}', event)" style="cursor:pointer; border-radius:4px; display:inline; transition: background 0.2s;" onmouseover="this.style.background='rgba(0,0,0,0.05)'" onmouseout="this.style.background='transparent'">${highlightedSentence}</span>`;
+        enHTML += `<span class="tts-sentence" data-index="${idx}" onclick="speakTTS('${cleanText}', event, ${idx}, this)" style="cursor:pointer;">${highlightedSentence}</span>`;
+    });
+
+    // 新增：将中文翻译同步按句子切分，建立完全一致的索引映射
+    const zhSentences = data.paragraph_zh.match(/[^。！？]+[。！？]*/g) || [data.paragraph_zh];
+    let zhHTML = '';
+    zhSentences.forEach((sentence, idx) => {
+        zhHTML += `<span class="zh-sentence" data-index="${idx}">${sentence}</span>`;
     });
 
     topSec.innerHTML = `
-        <div class="en-paragraph">${currentHighlightedEn}</div>
-        <div class="zh-translation">翻译：${data.paragraph_zh}</div>
+        <div class="en-paragraph">${enHTML}</div>
+        <div class="zh-translation">翻译：${zhHTML}</div>
     `;
     card.appendChild(topSec);
 
@@ -1063,7 +1152,7 @@ function initDrawingCanvas() {
             startX = e.clientX;
             startY = e.clientY;
             
-            // 瞬间穿透画布获取底层的真实单词 DOM 节点
+            // 瞬间穿透画布获取底层的真实 DOM 节点
             canvas.style.pointerEvents = 'none';
             targetElement = document.elementFromPoint(e.clientX, e.clientY);
             canvas.style.pointerEvents = 'auto';
@@ -1072,11 +1161,10 @@ function initDrawingCanvas() {
                 // 开启 500ms 纯净长按判定定时器
                 fingerTimer = setTimeout(() => {
                     isLongPressTriggered = true;
-                    // 使用 closest 确保点到释义块内部的音标或中文时，也能精准向上抓取到绑定的单词
+                    // 只有点在单词身上才执行欧陆长按唤起
                     const wordNode = targetElement.closest('[data-word]');
-                    const word = wordNode ? wordNode.getAttribute('data-word') : null;
-                    if (word && window.callEudic) {
-                        window.callEudic(word); // 唤醒欧路
+                    if (wordNode && window.callEudic) {
+                        window.callEudic(wordNode.getAttribute('data-word'));
                     }
                 }, 500);
             }
@@ -1121,7 +1209,13 @@ function initDrawingCanvas() {
             
             // 重要：只有在 500ms 内抬起、且从未触发过长按弹窗时，才判定为“普通短按”
             if (!isLongPressTriggered && targetElement) {
-                targetElement.click(); // 触发底层的 TTS 朗读发音
+                // 如果点到了单词标签，触发 TTS；点到空白区域(即非单词节点)则不做任何动作
+                const wordNode = targetElement.closest('[data-word]');
+                if (wordNode) {
+                    targetElement.click();
+                } else {
+                    // 空白处逻辑：如果需要交互可以在此添加（例如清空标注等）
+                }
             }
             targetElement = null;
         }
