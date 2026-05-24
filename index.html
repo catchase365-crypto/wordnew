@@ -508,20 +508,27 @@ let currentPenWeight = 3;
 let currentSpeechId = 0; // 核心修复：全局双语朗读版本追踪计数器
 
 // 升级版跨平台唤端引擎：完美适配 iOS 独立 App 安全策略
+// 升级版跨平台唤端引擎：增加 Android 分屏焦点强刷安全锁
 window.callEudic = function(word) {
     if (!word) return;
+    
+    // 强制剥离当前页面的所有文本选择蓝块与输入焦点，预防 Chrome 内核将触控死锁在被长按元素上
+    try {
+        window.getSelection().removeAllRanges();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+    } catch(e) {}
+
     const url = `eudic://dict/${encodeURIComponent(word)}`;
     
-    // 精准判定当前设备是否为苹果设备（iPhone / iPad）
+    // 精准判定当前设备是否为苹果设备
     const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     if (isApple) {
-        // 苹果系统特殊处理：隐藏 iframe 挂载会被静默拦截，必须改用 location.href 直调。
-        // 在 iOS PWA 独立主屏幕模式下，这不会导致退出全屏，只会唤醒欧路。
         window.location.href = url;
     } else {
-        // 安卓系统保持原样：使用隐式 iframe 完美规避 Chrome 退出全屏的 Bug
         let iframe = document.getElementById('eudic-trigger-iframe');
         if (!iframe) {
             iframe = document.createElement('iframe');
@@ -561,30 +568,39 @@ function speakTTS(text, event, sIdx, btnEl) {
     if(event) event.stopPropagation();
     if(!text) return;
     
-    // 核心修复：生成本次朗读的专属票据 ID，用来废弃之前未完成的异步回调
+    // 1. 核心版本计数，废弃因快速切换产生的异步幽灵回调
     const mySpeechId = ++currentSpeechId; 
     
+    // 2. 【核心大修】：强制结束并立刻强行恢复通道！
+    // 专门用来击碎长按单词调起欧路分屏时，Android 系统由于剥夺音频焦点导致的 Chrome 深度睡死状态
     window.speechSynthesis.cancel();
+    if (window.speechSynthesis.resume) {
+        window.speechSynthesis.resume();
+    }
 
-    // 1. 全局重置所有卡片的聚焦状态，防止样式残留
+    // 全局重置所有卡片的聚焦状态，防止样式残留
     document.querySelectorAll('.card-container').forEach(c => {
         c.classList.remove('has-focus');
         c.querySelectorAll('.active-focus').forEach(el => el.classList.remove('active-focus'));
     });
 
-    // 2. 如果传入了句子索引（说明是点击了句子，而非单个单词），开启舞台聚焦
+    // 如果传入了句子索引（说明是点击了句子，而非单个单词），开启舞台聚焦
     let currentCard = null;
     if (sIdx !== undefined && btnEl) {
         currentCard = btnEl.closest('.card-container');
         if (currentCard) {
             currentCard.classList.add('has-focus');
-            // 同时捞出当前卡片里对应索引的英文 span 和中文 span 赋予高亮
             currentCard.querySelectorAll(`.tts-sentence[data-index="${sIdx}"], .zh-sentence[data-index="${sIdx}"]`)
                        .forEach(el => el.classList.add('active-focus'));
         }
     }
 
     const u = new SpeechSynthesisUtterance(text);
+    
+    // 3. 【核心大修】：将语音实例强行挂载到全局 window 对象上
+    // 防止长句子在分屏焦点切换、重新建立系统 TTS 通道时，被浏览器的垃圾回收(GC)机制当成闲置变数误杀
+    window.currentSpeechUtterance = u;
+
     const voiceSelect = document.getElementById('voiceSelect');
     const voices = speechSynthesis.getVoices();
     const selectedVoice = voices.find(v => v.voiceURI === voiceSelect.value);
@@ -592,9 +608,8 @@ function speakTTS(text, event, sIdx, btnEl) {
     u.lang = 'en-US';
     u.rate = 0.9;
     
-    // 3. 朗读完毕后，只有当 mySpeechId 等于最新的 currentSpeechId 时才释放状态
+    // 朗读完毕后释放状态
     u.onend = () => {
-        // 重要判定：如果本句子在中途被新点击无情打断，直接告退，绝不清理新句子的样式！
         if (mySpeechId !== currentSpeechId) return; 
         
         if (currentCard) {
@@ -608,9 +623,8 @@ function speakTTS(text, event, sIdx, btnEl) {
         }
     };
 
-    // 4. 异常与打断事件保护
+    // 异常与打断事件保护
     u.onerror = () => {
-        // 核心修复：如果是因打断触发了 error 事件，直接忽略，不准擦除新句子的绿色高亮
         if (mySpeechId !== currentSpeechId) return; 
         
         if (currentCard) {
@@ -619,6 +633,7 @@ function speakTTS(text, event, sIdx, btnEl) {
         }
     };
 
+    // 4. 正式推入引擎执行
     window.speechSynthesis.speak(u);
 }
 
@@ -1209,12 +1224,12 @@ function initDrawingCanvas() {
             
             // 重要：只有在 500ms 内抬起、且从未触发过长按弹窗时，才判定为“普通短按”
             if (!isLongPressTriggered && targetElement) {
-                // 如果点到了单词标签，触发 TTS；点到空白区域(即非单词节点)则不做任何动作
+                // 【漏洞修复】：同时判定点击的目标是否属于单词（data-word）或长句子（.tts-sentence）
                 const wordNode = targetElement.closest('[data-word]');
-                if (wordNode) {
-                    targetElement.click();
-                } else {
-                    // 空白处逻辑：如果需要交互可以在此添加（例如清空标注等）
+                const sentenceNode = targetElement.closest('.tts-sentence');
+                
+                if (wordNode || sentenceNode) {
+                    targetElement.click(); // 完美允许穿透点击长句子
                 }
             }
             targetElement = null;
@@ -1433,7 +1448,8 @@ function downloadAllData() {
     saveAs(blob, "单词卡片纯文本数据.jsonl");
 }
 
-// 专门解决 iOS/iPadOS 正常浏览模式下长按不触发 oncontextmenu 导致无法弹窗的底层手势补丁
+// 终极修复：全平台普通浏览模式手势代理引擎
+// 彻底解决 Android Chrome 分屏流下，从欧路切回时文本 span 的原生 click 事件被浏览器吞噬的硬伤
 document.addEventListener('DOMContentLoaded', () => {
     let globalFingerTimer = null;
     let globalLongPressActive = false;
@@ -1444,28 +1460,36 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!lbInner) return;
 
     lbInner.addEventListener('touchstart', (e) => {
-        if (isPenMode) return; 
+        if (isPenMode) return; // 如果开启了批注模式，交由 Canvas 层的指针事件全权处理
         
-        gTargetElement = e.target.closest('[data-word]');
+        // 智能识别：既寻找单词块，也寻找长句子 span
+        gTargetElement = e.target.closest('[data-word]') || e.target.closest('.tts-sentence');
         if (!gTargetElement) return;
         
         globalLongPressActive = false;
         gStartX = e.touches[0].clientX;
         gStartY = e.touches[0].clientY;
         
-        globalFingerTimer = setTimeout(() => {
-            globalLongPressActive = true;
-            const word = gTargetElement.getAttribute('data-word');
-            if (word && window.callEudic) {
-                window.callEudic(word);
-            }
-        }, 500);
+        // 只有点在单词身上时，才启动 500ms 长按欧路唤醒时序
+        if (gTargetElement.hasAttribute('data-word')) {
+            globalFingerTimer = setTimeout(() => {
+                globalLongPressActive = true;
+                const word = gTargetElement.getAttribute('data-word');
+                if (word && window.callEudic) {
+                    // 唤起前强制清理全局选择集与高亮蓝块，防止内核焦点锁死
+                    window.getSelection().removeAllRanges();
+                    if(document.activeElement) document.activeElement.blur();
+                    window.callEudic(word);
+                }
+            }, 500);
+        }
     }, { passive: true });
 
     lbInner.addEventListener('touchmove', (e) => {
         if (isPenMode || !globalFingerTimer) return;
         const moveX = Math.abs(e.touches[0].clientX - gStartX);
         const moveY = Math.abs(e.touches[0].clientY - gStartY);
+        // 允许 12px 的脂肪形变微小手抖，超过则判定为翻页滑动，掐断长按
         if (moveX > 12 || moveY > 12) {
             clearTimeout(globalFingerTimer);
             globalFingerTimer = null;
@@ -1474,15 +1498,38 @@ document.addEventListener('DOMContentLoaded', () => {
 
     lbInner.addEventListener('touchend', (e) => {
         if (isPenMode) return;
+        
         if (globalFingerTimer) {
             clearTimeout(globalFingerTimer);
             globalFingerTimer = null;
         }
-        if (globalLongPressActive) {
-            e.preventDefault();
-            e.stopPropagation();
+        
+        if (gTargetElement) {
+            if (globalLongPressActive) {
+                // 如果是长按唤醒，直接拦截后续动作，防止松手时误触发单词读音
+                e.preventDefault();
+                e.stopPropagation();
+            } else {
+                // 🚀【核心高能修复】：如果是普通短按点击，不管你是单词还是长句子，
+                // 坚决不走浏览器脆弱的原生 click 转发，直接由 JS 原生驱动强制触发 .click() 
+                // 并调用 preventDefault 阻断 Chrome 内核的无理拦截，实现 100% 秒开点读！
+                e.preventDefault();
+                e.stopPropagation();
+                gTargetElement.click();
+            }
         }
-    }, { passive: false });
+        gTargetElement = null;
+    }, { passive: false }); // 必须为 false 允许 preventDefault 拦截系统默认吞选行为
+});
+
+// 新增全局窗口焦点重置监听：只要你从左侧欧路词典把手递回右侧 Chrome，瞬间洗净所有的选择残留
+window.addEventListener('focus', () => {
+    try {
+        window.getSelection().removeAllRanges();
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
+    } catch(err) {}
 });
 
 async function downloadAllImages() {
