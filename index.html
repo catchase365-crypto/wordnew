@@ -316,7 +316,28 @@
         .menu-item:hover { background: rgba(0, 255, 65, 0.1); }
         .menu-item.active { background: #00ff41; color: #000; font-weight: bold; }
 
-        /* 分类导航栏样式 */
+                /* 分类导航栏样式 */
+        .category-tab.is-read {
+            background: #1b5e20 !important;
+            border-color: #00ff41 !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 8px rgba(0, 255, 65, 0.5);
+        }
+        body.sepia-mode .category-tab.is-read {
+            background: #d7ccc8 !important; 
+            border-color: #8d6e63 !important;
+            color: #5b4636 !important;
+        }
+        body.ink-mode .category-tab.is-read {
+            background: #e0e0e0 !important;
+            border-color: #000000 !important;
+            color: #000000 !important;
+            text-decoration: line-through;
+        }
+        .category-tab.is-read::before {
+            content: "✓ ";
+            font-weight: bold;
+        }
         .category-tabs {
             width: 100%; max-width: 1200px; margin: 0 auto 15px auto;
             display: grid; grid-template-rows: repeat(5, auto); grid-auto-flow: column;
@@ -434,6 +455,27 @@
 <div id="stagingArea"></div>
 
 <script>
+// 新增：从本地存储永久初始化已阅读卡片的唯一 Key 集合
+let readCards = new Set(JSON.parse(localStorage.getItem('catchase_read_cards') || '[]'));
+
+// 新增：根据卡片内被点击的组件，往上追溯并标记该卡片为已阅读状态
+function markCardAsReadByElement(el) {
+    if (!el) return;
+    const card = el.closest('.card-container');
+    if (!card) return;
+    const cardKey = card.getAttribute('data-card-key');
+    if (cardKey && !readCards.has(cardKey)) {
+        readCards.add(cardKey);
+        localStorage.setItem('catchase_read_cards', JSON.stringify([...readCards]));
+        const homeTabs = document.querySelectorAll('#resultsGrid .category-tab');
+        homeTabs.forEach(tab => {
+            if (tab.getAttribute('data-card-key') === cardKey) {
+                tab.classList.add('is-read');
+            }
+        });
+    }
+}
+
 // 🌟 新增：注册 PWA 的离线引擎
 if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
@@ -509,8 +551,9 @@ let currentSpeechId = 0; // 核心修复：全局双语朗读版本追踪计数�
 
 // 升级版跨平台唤端引擎：完美适配 iOS 独立 App 安全策略
 // 升级版跨平台唤端引擎：增加 Android 分屏焦点强刷安全锁
-window.callEudic = function(word) {
+window.callEudic = function(word, el) {
     if (!word) return;
+    if (el) markCardAsReadByElement(el);
     
     // 强制剥离当前页面的所有文本选择蓝块与输入焦点，预防 Chrome 内核将触控死锁在被长按元素上
     try {
@@ -565,6 +608,7 @@ function saveVoicePreference() {
 }
 
 function speakTTS(text, event, sIdx, btnEl) {
+    if (event && event.target) markCardAsReadByElement(event.target);
     if(event) event.stopPropagation();
     if(!text) return;
     
@@ -730,6 +774,7 @@ function createBaseCardDOM(data) {
     const card = document.createElement('div');
     const theme = isInkMode ? 'ink' : currentGlobalTheme;
     card.className = `card-container theme-${theme}`;
+    card.setAttribute('data-card-key', `${data.c}_${data.theme}`);
 
     const topSec = document.createElement('div');
     topSec.className = 'top-section';
@@ -783,7 +828,7 @@ function createBaseCardDOM(data) {
     data.words.forEach((item, i) => {
         const color = HighlighterColors[i % HighlighterColors.length];
         const cleanWord = item.word.replace(/'/g, "\\'");
-        defHTML += `<div class="def-item" data-word="${cleanWord}" style="flex-direction: column; align-items: flex-start; cursor:pointer; transition: transform 0.2s;" onclick="speakTTS('${cleanWord}', event)" oncontextmenu="window.callEudic('${cleanWord}'); return false;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
+        defHTML += `<div class="def-item" data-word="${cleanWord}" style="flex-direction: column; align-items: flex-start; cursor:pointer; transition: transform 0.2s;" onclick="speakTTS('${cleanWord}', event)" oncontextmenu="window.callEudic('${cleanWord}', this); return false;" onmouseover="this.style.transform='scale(1.02)'" onmouseout="this.style.transform='scale(1)'">
             <div style="margin-bottom: 2px;"><mark class="hl" style="background-color: ${color}; font-weight: 600; margin-right: 6px;">${item.word}</mark><span style="font-size: 12px; color: #888;">${item.phonetic || ''}</span></div>
             <div class="zh-def" style="color: #444;">${item.definition}</div>
         </div>`;
@@ -1069,6 +1114,11 @@ async function renderCategory(category) {
         wrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
         wrapper.style.borderColor = 'rgba(255, 255, 255, 0.1)';
         wrapper.innerText = data.theme;
+        const cardKey = `${data.c}_${data.theme}`;
+        wrapper.setAttribute('data-card-key', cardKey);
+        if (readCards.has(cardKey)) {
+            wrapper.classList.add('is-read');
+        }
         wrapper.onclick = async () => {
             if (!generatedDOMs[i]) {
                 const cardDOM = createBaseCardDOM(data);
