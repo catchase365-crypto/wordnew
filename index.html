@@ -1425,6 +1425,19 @@ function closeLightbox() {
     document.getElementById('lightbox').style.display = 'none';
     document.getElementById('lightboxMenu').style.display = 'none';
     document.body.style.overflow = 'auto';
+
+    // 修复：如果从随机模式退出，恢复当前激活分类的数据映射，防止点击普通卡片索引错乱
+    if (currentCategory === 'Random') {
+        const activeTab = document.querySelector('.category-tab.active');
+        if (activeTab) {
+            const cat = activeTab.innerText;
+            currentCategory = cat;
+            const filteredData = cat === 'All' ? allImportedData : allImportedData.filter(d => d.c === cat);
+            rawResultsData = filteredData;
+            generatedImagesData = new Array(filteredData.length).fill(null);
+            generatedDOMs = new Array(filteredData.length).fill(null);
+        }
+    }
 }
 
 function nextImage(e) {
