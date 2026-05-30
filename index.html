@@ -561,7 +561,11 @@ window.callEudic = function(word, el) {
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
     const isPC = !('ontouchstart' in window) && window.matchMedia('(pointer: fine)').matches;
-    if (isPC) return; // 电脑端禁止触发欧路词典，仅限移动端
+    if (isPC) {
+        // 电脑端右键点击单词列表项时，执行朗读而非唤起词典
+        speakTTS(word);
+        return;
+    }
 
     if (isApple) {
         window.location.href = url;
@@ -686,9 +690,7 @@ async function startRandomMode() {
 }
 
 function handlePCWordRightClick(e) {
-    const isPC = !('ontouchstart' in window) && window.matchMedia('(pointer: fine)').matches;
-    if (!isPC) return; 
-
+    // 移除 !isPC 限制，允许移动端/平板的 Pen 按钮（模拟右键）以及电脑右键触发点读
     e.preventDefault();
     e.stopPropagation();
 
