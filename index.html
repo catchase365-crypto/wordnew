@@ -598,6 +598,27 @@ function saveVoicePreference() {
     localStorage.setItem('app_tts_voice', voiceSelect.value);
 }
 
+function speakWordAtPoint(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    let range, textNode, offset;
+    if (document.caretRangeFromPoint) {
+        range = document.caretRangeFromPoint(e.clientX, e.clientY);
+        textNode = range.startContainer;
+        offset = range.startOffset;
+    } else if (e.rangeParent) {
+        textNode = e.rangeParent;
+        offset = e.rangeOffset;
+    }
+    if (textNode && textNode.nodeType === 3) {
+        const text = textNode.textContent;
+        const before = text.substring(0, offset).match(/[a-zA-Z']+$/);
+        const after = text.substring(offset).match(/^[a-zA-Z']+/);
+        const word = (before ? before[0] : "") + (after ? after[0] : "");
+        if (word) speakTTS(word, e);
+    }
+}
+
 function speakTTS(text, event, sIdx, btnEl) {
     if (event && event.target) markCardAsReadByElement(event.target);
     if(event) event.stopPropagation();
@@ -793,7 +814,7 @@ function createBaseCardDOM(data) {
             return match;
         });
         const cleanText = sentence.replace(/'/g, "\\'").replace(/"/g, "&quot;").trim();
-        enHTML += `<span class="tts-sentence" data-index="${idx}" onclick="speakTTS('${cleanText}', event, ${idx}, this)" style="cursor:pointer;">${highlightedSentence}</span>`;
+        enHTML += `<span class="tts-sentence" data-index="${idx}" onclick="speakTTS('${cleanText}', event, ${idx}, this)" oncontextmenu="speakWordAtPoint(event); return false;" style="cursor:pointer;">${highlightedSentence}</span>`;
     });
 
     // 新增：将中文翻译同步按句子切分，建立完全一致的索引映射
