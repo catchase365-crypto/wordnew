@@ -560,6 +560,9 @@ window.callEudic = function(word, el) {
     const isApple = /iPad|iPhone|iPod/.test(navigator.userAgent) || 
                     (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     
+    const isPC = !('ontouchstart' in window) && window.matchMedia('(pointer: fine)').matches;
+    if (isPC) return; // 电脑端禁止触发欧路词典，仅限移动端
+
     if (isApple) {
         window.location.href = url;
     } else {
@@ -596,27 +599,6 @@ if (speechSynthesis.onvoiceschanged !== undefined) {
 function saveVoicePreference() {
     const voiceSelect = document.getElementById('voiceSelect');
     localStorage.setItem('app_tts_voice', voiceSelect.value);
-}
-
-function speakWordAtPoint(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    let range, textNode, offset;
-    if (document.caretRangeFromPoint) {
-        range = document.caretRangeFromPoint(e.clientX, e.clientY);
-        textNode = range.startContainer;
-        offset = range.startOffset;
-    } else if (e.rangeParent) {
-        textNode = e.rangeParent;
-        offset = e.rangeOffset;
-    }
-    if (textNode && textNode.nodeType === 3) {
-        const text = textNode.textContent;
-        const before = text.substring(0, offset).match(/[a-zA-Z']+$/);
-        const after = text.substring(offset).match(/^[a-zA-Z']+/);
-        const word = (before ? before[0] : "") + (after ? after[0] : "");
-        if (word) speakTTS(word, e);
-    }
 }
 
 function speakTTS(text, event, sIdx, btnEl) {
@@ -701,6 +683,36 @@ async function startRandomMode() {
     generatedImagesData = new Array(rawResultsData.length).fill(null);
     generatedDOMs = new Array(rawResultsData.length).fill(null);
     openLightbox(0);
+}
+
+function handlePCWordRightClick(e) {
+    const isPC = !('ontouchstart' in window) && window.matchMedia('(pointer: fine)').matches;
+    if (!isPC) return; 
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    let word = "";
+    if (e.target.classList.contains('hl')) {
+        word = e.target.innerText;
+    } else {
+        if (document.caretRangeFromPoint) {
+            const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+            const sel = window.getSelection();
+            if (range) {
+                range.expand('word');
+                sel.removeAllRanges();
+                sel.addRange(range);
+                word = sel.toString().trim();
+                sel.removeAllRanges();
+            }
+        }
+    }
+    
+    word = word.replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g,"");
+    if (word && word.length > 0) {
+        speakTTS(word);
+    }
 }
 
 function toggleAutoLoop() {
@@ -814,7 +826,7 @@ function createBaseCardDOM(data) {
             return match;
         });
         const cleanText = sentence.replace(/'/g, "\\'").replace(/"/g, "&quot;").trim();
-        enHTML += `<span class="tts-sentence" data-index="${idx}" onclick="speakTTS('${cleanText}', event, ${idx}, this)" oncontextmenu="speakWordAtPoint(event); return false;" style="cursor:pointer;">${highlightedSentence}</span>`;
+        enHTML += `<span class="tts-sentence" data-index="${idx}" onclick="speakTTS('${cleanText}', event, ${idx}, this)" style="cursor:pointer;">${highlightedSentence}</span>`;
     });
 
     // 新增：将中文翻译同步按句子切分，建立完全一致的索引映射
@@ -825,7 +837,7 @@ function createBaseCardDOM(data) {
     });
 
     topSec.innerHTML = `
-        <div class="en-paragraph">${enHTML}</div>
+        <div class="en-paragraph" oncontextmenu="handlePCWordRightClick(event)">${enHTML}</div>
         <div class="zh-translation">翻译：${zhHTML}</div>
     `;
     card.appendChild(topSec);
