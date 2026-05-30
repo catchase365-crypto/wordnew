@@ -689,6 +689,26 @@ async function startRandomMode() {
     openLightbox(0);
 }
 
+function getWordAtPoint(x, y, target) {
+    if (!target) return "";
+    if (target.classList.contains('hl')) {
+        return target.innerText.replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g,"").trim();
+    }
+    if (document.caretRangeFromPoint) {
+        const range = document.caretRangeFromPoint(x, y);
+        if (range) {
+            const sel = window.getSelection();
+            sel.removeAllRanges();
+            sel.addRange(range);
+            range.expand('word');
+            const word = sel.toString().trim().replace(/[.,/#!$%^&*;:{}=\-_`~()"']/g,"");
+            sel.removeAllRanges();
+            return word;
+        }
+    }
+    return "";
+}
+
 function handlePCWordRightClick(e) {
     // 移除 !isPC 限制，允许移动端/平板的 Pen 按钮（模拟右键）以及电脑右键触发点读
     e.preventDefault();
@@ -1249,13 +1269,19 @@ function initDrawingCanvas() {
             canvas.style.pointerEvents = 'auto';
 
             if (targetElement) {
-                // 开启 500ms 纯净长按判定定时器
+                // 开启 500ms 纯净长按判定定时器 (支持中下部单词与上部文段单词)
                 fingerTimer = setTimeout(() => {
                     isLongPressTriggered = true;
-                    // 只有点在单词身上才执行欧陆长按唤起
+                    let word = "";
                     const wordNode = targetElement.closest('[data-word]');
-                    if (wordNode && window.callEudic) {
-                        window.callEudic(wordNode.getAttribute('data-word'));
+                    const sentenceNode = targetElement.closest('.tts-sentence');
+                    if (wordNode) {
+                        word = wordNode.getAttribute('data-word');
+                    } else if (sentenceNode && targetElement.closest('.en-paragraph')) {
+                        word = getWordAtPoint(e.clientX, e.clientY, targetElement);
+                    }
+                    if (word && window.callEudic) {
+                        window.callEudic(word, targetElement);
                     }
                 }, 500);
             }
@@ -1551,27 +1577,33 @@ document.addEventListener('DOMContentLoaded', () => {
     lbInner.addEventListener('touchstart', (e) => {
         if (isPenMode) return; // 如果开启了批注模式，交由 Canvas 层的指针事件全权处理
         
+        const clientX = e.touches[0].clientX;
+        const clientY = e.touches[0].clientY;
+        
         // 智能识别：既寻找单词块，也寻找长句子 span
         gTargetElement = e.target.closest('[data-word]') || e.target.closest('.tts-sentence');
         if (!gTargetElement) return;
         
         globalLongPressActive = false;
-        gStartX = e.touches[0].clientX;
-        gStartY = e.touches[0].clientY;
+        gStartX = clientX;
+        gStartY = clientY;
         
-        // 只有点在单词身上时，才启动 500ms 长按欧路唤醒时序
-        if (gTargetElement.hasAttribute('data-word')) {
-            globalFingerTimer = setTimeout(() => {
-                globalLongPressActive = true;
-                const word = gTargetElement.getAttribute('data-word');
-                if (word && window.callEudic) {
-                    // 唤起前强制清理全局选择集与高亮蓝块，防止内核焦点锁死
-                    window.getSelection().removeAllRanges();
-                    if(document.activeElement) document.activeElement.blur();
-                    window.callEudic(word);
-                }
-            }, 500);
-        }
+        // 启动 500ms 长按欧路唤醒时序 (支持中下部单词 [data-word] 与上部文段单词)
+        globalFingerTimer = setTimeout(() => {
+            globalLongPressActive = true;
+            let word = "";
+            if (gTargetElement.hasAttribute('data-word')) {
+                word = gTargetElement.getAttribute('data-word');
+            } else if (gTargetElement.closest('.en-paragraph')) {
+                word = getWordAtPoint(clientX, clientY, e.target);
+            }
+            if (word && window.callEudic) {
+                // 唤起前强制清理全局选择集与高亮蓝块，防止内核焦点锁死
+                window.getSelection().removeAllRanges();
+                if(document.activeElement) document.activeElement.blur();
+                window.callEudic(word, gTargetElement);
+            }
+        }, 500);
     }, { passive: true });
 
     lbInner.addEventListener('touchmove', (e) => {
