@@ -143,6 +143,91 @@
         .theme-sepia .def-item { background: rgba(141, 110, 99, 0.1); }
         .theme-sepia .def-item div { color: #5b4636 !important; }
 
+        /* ==================== 新增：爱马仕奢华高定主题 (theme-hermes) ==================== */
+        .theme-hermes {
+            --card-bg: #14110f; /* 极深马鞍黑棕色，透露出昂贵的皮革基调 */
+            --text-color: #fdfaf7; /* 象牙丝绸白，绝对不用刺眼的纯白 */
+            --border-color: rgba(243, 112, 33, 0.25); /* 爱马仕橙微光边框 */
+            --accent: #f37021; /* 殿堂级爱马仕纯正橙色 */
+            --bg-img: radial-gradient(circle at 10% 10%, rgba(243, 112, 33, 0.08) 0%, rgba(0,0,0,0) 50%), radial-gradient(circle at 90% 90%, rgba(194, 155, 110, 0.05) 0%, rgba(0,0,0,0) 60%);
+            --app-bg: #0e0c0b; /* 奢侈品展厅特有的深邃暗色背景 */
+            --app-text: #e6e1da;
+            --app-border: rgba(243, 112, 33, 0.2);
+            --app-accent: #f37021;
+        }
+        
+        /* 1. 主面板与核心卡片：高级皮革缝线与精细悬浮阴影 */
+        .theme-hermes .top-section, 
+        .theme-hermes .bottom-section, 
+        .theme-hermes .center-word, 
+        .theme-hermes .header-box { 
+            background: #181412 !important; 
+            color: #fdfaf7 !important; 
+            border: 1px solid rgba(243, 112, 33, 0.25) !important;
+            /* 多层极致细腻的奢华暗面阴影，营造高级悬浮感 */
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.05) !important;
+        }
+        
+        /* 2. 单词树气泡适配：手工定制的皮革铭牌质感 */
+        .theme-hermes .word-item { 
+            color: #14110f !important;
+            border: 2px solid #f37021 !important;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            font-weight: 700 !important;
+        }
+        
+        /* 3. 翻译文段与单词释义的色彩降噪，突出主要文字层级 */
+        .theme-hermes .zh-translation { color: rgba(245, 240, 235, 0.6) !important; border-top: 1px dashed rgba(243, 112, 33, 0.2) !important; }
+        .theme-hermes .def-item { background: #1c1714 !important; border: 1px solid rgba(243, 112, 33, 0.1) !important; }
+        .theme-hermes .def-item div { color: rgba(245, 240, 235, 0.8) !important; }
+        
+        /* 4. 双语句子级点读高亮：爱马仕专属“舞台橙流光”聚焦 */
+        .theme-hermes .active-focus {
+            background-color: rgba(243, 112, 33, 0.2) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 20px rgba(243, 112, 33, 0.4) !important;
+            opacity: 1 !important;
+        }
+        
+        /* 5. 英文正文的高级印刷排版文字阴影 */
+        .theme-hermes .en-paragraph span { text-shadow: 0 2px 4px rgba(0,0,0,0.6); }
+
+        /* 6. 全局大背景：奢华暗色展厅背景，带有一丝从角落溢出的暖橙琥珀微光 */
+        body.hermes-mode { 
+            background-color: #0e0c0b !important; 
+            background-image: radial-gradient(circle at 0% 0%, rgba(243, 112, 33, 0.12) 0%, rgba(0,0,0,0) 45%), radial-gradient(circle at 100% 100%, rgba(194, 155, 110, 0.06) 0%, rgba(0,0,0,0) 50%) !important;
+            background-attachment: fixed;
+        }
+        
+        /* 7. 主配置面板、操作按钮与全屏相册：统一换装爱马仕手工高定风格 */
+        body.hermes-mode .config-panel, 
+        body.hermes-mode .lightbox-close, 
+        body.hermes-mode .lightbox-counter, 
+        body.hermes-mode .lightbox-fs-btn, 
+        body.hermes-mode .lightbox-trans-btn, 
+        body.hermes-mode .lightbox-menu, 
+        body.hermes-mode .lightbox-progress {
+            background: #181412 !important;
+            color: #fdfaf7 !important;
+            border: 1px solid rgba(243, 112, 33, 0.25) !important;
+            box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8) !important;
+        }
+        body.hermes-mode .config-panel h3, body.hermes-mode .tips { color: #fdfaf7; text-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        
+        /* 按钮设计成标志性的爱马仕经典橙色包装盒质感 */
+        body.hermes-mode button, body.hermes-mode .icon-btn {
+            background: #f37021 !important; color: #0e0c0b !important; border: 1px solid #f37021 !important; font-weight: bold;
+        }
+        body.hermes-mode button:hover, body.hermes-mode .icon-btn:hover { background: #ff8135 !important; border-color: #ff8135 !important; box-shadow: 0 0 15px rgba(243, 112, 33, 0.4); }
+        body.hermes-mode input, body.hermes-mode textarea, body.hermes-mode select { background: #0e0c0b; color: #fdfaf7; border: 1px solid rgba(243, 112, 33, 0.2); }
+        
+        /* 分类标签设计 */
+        body.hermes-mode .category-tab { background: #1c1714; border: 1px solid rgba(243, 112, 33, 0.15); color: rgba(253, 250, 247, 0.6); }
+        body.hermes-mode .category-tab.active { background: #f37021 !important; color: #0e0c0b !important; border-color: #f37021 !important; font-weight: bold; }
+        body.hermes-mode .category-tab.is-read { background: #231b17 !important; border-color: rgba(194, 155, 110, 0.3) !important; color: #c29b6e !important; }
+        body.hermes-mode .menu-item { color: rgba(253, 250, 247, 0.7); border: 1px solid rgba(243, 112, 33, 0.15); }
+        body.hermes-mode .menu-item.active { background: #f37021; color: #0e0c0b; border-color: #f37021; }
+
                 /* 墨水屏模式 (E-Ink) 专属样式全面强制覆盖 */
         body.ink-mode { --card-w: 750px; --card-h: 1000px; background: #ffffff !important; color: #000000 !important; }
         body.ink-mode .config-panel { background: #ffffff; border: 2px solid #000; box-shadow: none; color: #000; }
@@ -1176,7 +1261,10 @@ async function changeTheme(val) {
 }
 
 function toggleDarkLight() {
-    const nextTheme = currentGlobalTheme === 'oled' ? 'sepia' : 'oled';
+    let nextTheme = 'oled';
+    if (currentGlobalTheme === 'oled') nextTheme = 'sepia';
+    else if (currentGlobalTheme === 'sepia') nextTheme = 'hermes';
+    else nextTheme = 'oled';
     changeTheme(nextTheme);
 }
 
@@ -1194,7 +1282,7 @@ function toggleHideTranslation() {
 }
 
 function applyThemeToBody() {
-    document.body.classList.remove('ink-mode', 'sepia-mode');
+    document.body.classList.remove('ink-mode', 'sepia-mode', 'hermes-mode');
     const root = document.documentElement;
     const themeClass = isInkMode ? 'theme-ink' : `theme-${currentGlobalTheme}`;
     
@@ -1228,6 +1316,8 @@ function applyThemeToBody() {
         document.body.classList.add('ink-mode');
     } else if (currentGlobalTheme === 'sepia') {
         document.body.classList.add('sepia-mode');
+    } else if (currentGlobalTheme === 'hermes') {
+        document.body.classList.add('hermes-mode');
     }
 
     if (isHideTranslation) {
@@ -1239,7 +1329,11 @@ function applyThemeToBody() {
     }
     
     const btn = document.getElementById('themeToggleBtn');
-    if(btn) btn.innerText = currentGlobalTheme === 'oled' ? '🌃 深色模式 (绿)' : '📜 棕褐模式 (亮)';
+    if(btn) {
+        if (currentGlobalTheme === 'oled') btn.innerText = '🌃 深色模式 (绿)';
+        else if (currentGlobalTheme === 'sepia') btn.innerText = '📜 棕褐模式 (亮)';
+        else if (currentGlobalTheme === 'hermes') btn.innerText = '🍊 爱马仕橙 (奢)';
+    }
     document.getElementById('inkModeBtn').innerText = isInkMode ? '📖 墨水屏:开' : '📖 墨水屏:关';
 
     if(typeof renderCalendar === 'function') renderCalendar();
