@@ -12,6 +12,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.2/peerjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
     <style>
         :root {
             --primary-color: #7d5a50;
@@ -313,6 +316,10 @@
         .menu-item { padding: 10px 4px; color: #00ff41; font-size: 11px; cursor: pointer; border: 1px solid rgba(0, 255, 65, 0.2); border-radius: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-align: center; }
         .menu-item:hover { background: rgba(0, 255, 65, 0.1); }
         .menu-item.active { background: #00ff41; color: #000; font-weight: bold; }
+        .lightbox-progress { position: absolute; top: 8px; left: 165px; color: white; font-size: 12px; background: rgba(0, 255, 65, 0.1); border: 1px solid #00ff41; padding: 4px 12px; border-radius: 20px; z-index: 2100; backdrop-filter: blur(5px); display: none; align-items: center; white-space: nowrap; }
+        @media (min-width: 768px) { .lightbox-progress.tablet-only { display: flex !important; } }
+        body.sepia-mode .lightbox-progress { background: #fdfaf3; border: 1px solid #d3c4a9; color: #5b4636; }
+        body.ink-mode .lightbox-progress { background: #fff; border: 2px solid #000; color: #000; }
 
                 /* 分类导航栏样式 */
         .category-tab.is-read {
@@ -409,6 +416,7 @@
         <button id="inkModeBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleInkMode()">📖 墨水屏</button>
         <button id="hideTransBtn" class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="toggleHideTranslation()">👁️ 隐藏中文</button>
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="forceSync()">🔄 同步</button>
+        <button class="icon-btn" id="syncBtn" style="flex: 1; min-width: 120px; justify-content: center; background: #2196F3 !important; color: white !important; border-color: #0b7dda;" onclick="startAutoSync()">📲 局域网同步</button>
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center; background: #e91e63 !important; color: white !important; border-color: #ff4081;" onclick="startRandomMode()">🎲 随机挑战</button>
     </div>
 
@@ -462,9 +470,23 @@
 
     <div id="lightboxInner" class="lightbox-inner" onclick="event.stopPropagation()"></div>
     <div id="lightboxCounter" class="lightbox-counter"></div>
+    <div id="lightboxProgress" class="lightbox-progress tablet-only"></div>
     <div id="lightboxMenu" class="lightbox-menu"></div>
 </div>
 <div id="stagingArea"></div>
+
+<div id="p2pSyncModal" class="lightbox" style="z-index: 3000; display: none; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; padding: 20px;">
+    <div class="config-panel" style="max-width: 400px; text-align: center; background: #000; border: 2px solid #00ff41; color: #fff; padding: 40px 20px;">
+        <div id="syncIcon" style="font-size: 50px; margin-bottom: 20px; animation: rotate 2s linear infinite;">🔄</div>
+        <h3 id="syncTitle" style="color: #00ff41; margin-bottom: 10px;">正在搜寻同步设备...</h3>
+        <p id="syncDesc" style="font-size: 14px; color: #888; line-height: 1.6;">请确保其他设备也在 10 秒内点击了同步按钮。<br>系统正在局域网内自动匹配学习进度。</p>
+        <div id="syncProgress" style="width: 100%; height: 4px; background: #222; margin-top: 25px; border-radius: 2px; overflow: hidden;">
+            <div id="syncProgressBar" style="width: 100%; height: 100%; background: #00ff41; transition: width 10s linear;"></div>
+        </div>
+        <button class="icon-btn" style="margin-top: 30px; width: 100%; justify-content: center;" onclick="closeP2PSync()">取消</button>
+    </div>
+    <style> @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } </style>
+</div>
 
 <script>
 // 新增：从本地存储永久初始化已阅读卡片的唯一 Key 集合
@@ -503,7 +525,18 @@ function markCardAsReadByElement(el) {
         dailyData[dateStr].push(cardKey);
         localStorage.setItem('catchase_daily_read', JSON.stringify(dailyData));
         if(typeof renderCalendar === 'function') renderCalendar();
+        updateTodayProgressUI();
     }
+}
+
+function updateTodayProgressUI() {
+    const el = document.getElementById('lightboxProgress');
+    if (!el) return;
+    const today = new Date();
+    const dateStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const dailyData = JSON.parse(localStorage.getItem('catchase_daily_read') || '{}');
+    const count = dailyData[dateStr] ? dailyData[dateStr].length : 0;
+    el.innerHTML = `🏆 今日已学: ${count} 张`;
 }
 
 let currentCalDate = new Date();
@@ -1586,6 +1619,7 @@ async function updateLightboxContent() {
     const startIdx = currentGalleryIndex + 1;
     const endIdx = Math.min(currentGalleryIndex + cardsPerView, rawResultsData.length);
     
+    updateTodayProgressUI();
     if (currentCategory === 'Random') {
         counter.innerText = `🎲 随机模式 [${startIdx === endIdx ? startIdx : `${startIdx}-${endIdx}`}]`;
         counter.onclick = null;
@@ -1831,6 +1865,139 @@ async function downloadAllImages() {
         }
     }
 }
+
+// --- P2P 设备互通同步引擎 ---
+// 全局 PeerJS 配置：引入国内通畅的 STUN 穿透服务器，解决跨网络打洞问题
+const peerConfig = {
+    config: {
+        iceServers: [
+            { urls: 'stun:stun.aliyun.com:19302' },
+            { urls: 'stun:stun.tencentcloud.com:19302' },
+            { urls: 'stun:stun.l.google.com:19302' }
+        ]
+    }
+};
+let peer = null;
+let p2pConn = null;
+let qrStream = null;
+let qrVideoInterval = null;
+
+let syncTimer = null;
+function startAutoSync() {
+    document.getElementById('p2pSyncModal').style.display = 'flex';
+    const bar = document.getElementById('syncProgressBar');
+    const title = document.getElementById('syncTitle');
+    const desc = document.getElementById('syncDesc');
+    
+    // 核心修复：每次开启同步前强制重置 UI 状态到初始值
+    title.innerText = "正在搜寻同步设备...";
+    desc.innerHTML = "请确保其他设备也在 10 秒内点击了同步按钮。<br>系统正在局域网内自动匹配学习进度。";
+    bar.style.backgroundColor = '#00ff41';
+    bar.style.width = '100%';
+    setTimeout(() => bar.style.width = '0%', 10);
+    
+    // 基于当前时间的 10 秒区间生成共享 ID (10秒内点击即同组)
+    const timeBucket = Math.floor(Date.now() / 10000);
+    const syncRoomId = `catchase_sync_v2_${timeBucket}`;
+    
+    if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
+
+    // 尝试作为主机建立房间
+    peer = new Peer(syncRoomId, peerConfig);
+    
+    peer.on('open', (id) => {
+        console.log("As Host:", id);
+        title.innerText = "已开启同步等待...";
+        peer.on('connection', (conn) => {
+            title.innerText = "🤝 已发现设备，同步中...";
+            conn.on('open', () => {
+                conn.send({ type: 'sync_data', payload: getSyncData() });
+            });
+            conn.on('data', (data) => {
+                if(data.type === 'sync_data') {
+                    mergeSyncData(data.payload);
+                    title.innerText = "✅ 同步合并成功！";
+                    setTimeout(closeP2PSync, 1500);
+                }
+            });
+        });
+    });
+
+    peer.on('error', (err) => {
+        if (err.type === 'unavailable-id') {
+            // 房间已被占用，作为客户端连接
+            console.log("As Client connecting to:", syncRoomId);
+            peer = new Peer(peerConfig);
+            peer.on('open', () => {
+                const conn = peer.connect(syncRoomId);
+                conn.on('open', () => {
+                    title.innerText = "🔗 已连接设备，同步中...";
+                    conn.send({ type: 'sync_data', payload: getSyncData() });
+                });
+                conn.on('data', (data) => {
+                    if(data.type === 'sync_data') {
+                        mergeSyncData(data.payload);
+                        title.innerText = "✅ 同bs同步合并成功！";
+                        setTimeout(closeP2PSync, 1500);
+                    }
+                });
+            });
+        } else {
+            title.innerText = "❌ 同步失败: " + err.type;
+        }
+    });
+
+    syncTimer = setTimeout(() => {
+        if (document.getElementById('p2pSyncModal').style.display === 'flex' && !title.innerText.includes('✅')) {
+            title.innerText = "⌛ 未发现其他同步设备";
+            setTimeout(closeP2PSync, 2000);
+        }
+    }, 10000);
+}
+
+function closeP2PSync() {
+    document.getElementById('p2pSyncModal').style.display = 'none';
+    if(syncTimer) clearTimeout(syncTimer);
+    if(p2pConn) { try { p2pConn.close(); } catch(e){} p2pConn = null; }
+    if(peer) { try { peer.destroy(); } catch(e){} peer = null; }
+}
+
+function getSyncData() {
+    return {
+        readCards: JSON.parse(localStorage.getItem('catchase_read_cards') || '[]'),
+        dailyRead: JSON.parse(localStorage.getItem('catchase_daily_read') || '{}')
+    };
+}
+
+function mergeSyncData(remoteData) {
+    let localCards = new Set(JSON.parse(localStorage.getItem('catchase_read_cards') || '[]'));
+    if (remoteData.readCards) remoteData.readCards.forEach(c => localCards.add(c));
+    localStorage.setItem('catchase_read_cards', JSON.stringify([...localCards]));
+    readCards = localCards;
+    
+    let localDaily = JSON.parse(localStorage.getItem('catchase_daily_read') || '{}');
+    if (remoteData.dailyRead) {
+        for(let date in remoteData.dailyRead) {
+            if(!localDaily[date]) localDaily[date] = [];
+            let ds = new Set(localDaily[date]);
+            remoteData.dailyRead[date].forEach(c => ds.add(c));
+            localDaily[date] = [...ds];
+        }
+    }
+    localStorage.setItem('catchase_daily_read', JSON.stringify(localDaily));
+    
+    if(typeof renderCalendar === 'function') renderCalendar();
+    if(typeof updateTodayProgressUI === 'function') updateTodayProgressUI();
+    
+    const homeTabs = document.querySelectorAll('#resultsGrid .category-tab');
+    homeTabs.forEach(tab => {
+        if (readCards.has(tab.getAttribute('data-card-key'))) {
+            tab.classList.add('is-read');
+        }
+    });
+}
+
+
 </script>
 </body>
 </html>
