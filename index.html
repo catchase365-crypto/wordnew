@@ -430,7 +430,21 @@
 </div>
 
 <div id="categoryTabs" class="category-tabs"></div>
+
 <div id="resultsGrid" class="results-grid"></div>
+
+<hr style="width:100%; max-width:1200px; border:none; border-top:1px dashed var(--app-border); margin:30px auto 10px auto; opacity:0.5;">
+<div id="calendarContainer" style="width:100%; max-width:1200px; margin:0 auto 25px auto; padding:15px; background:transparent; border:1px solid var(--app-border); border-radius:8px; color:var(--app-text); box-sizing:border-box;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+        <button class="icon-btn" onclick="changeMonth(-1)">◀ 上月</button>
+        <div style="font-weight:bold; font-size:16px; cursor:pointer;" onclick="changeMonth(0)">📅 <span id="calYear"></span>年 <span id="calMonth"></span>月</div>
+        <button class="icon-btn" onclick="changeMonth(1)">下月 ▶</button>
+    </div>
+    <div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px; text-align:center; font-size:13px; margin-bottom:8px; font-weight:bold;">
+        <div>日</div><div>一</div><div>二</div><div>三</div><div>四</div><div>五</div><div>六</div>
+    </div>
+    <div id="calGrid" style="display:grid; grid-template-columns:repeat(7, 1fr); gap:6px;"></div>
+</div>
 
 <div id="lightbox" class="lightbox">
     <span class="lightbox-close" onclick="closeLightbox()">✕</span>
@@ -462,7 +476,10 @@ function markCardAsReadByElement(el) {
     const card = el.closest('.card-container');
     if (!card) return;
     const cardKey = card.getAttribute('data-card-key');
-    if (cardKey && !readCards.has(cardKey)) {
+    if (!cardKey) return;
+
+    // 1. 如果是首次阅读，更新全局已学集合及首页高亮状态
+    if (!readCards.has(cardKey)) {
         readCards.add(cardKey);
         localStorage.setItem('catchase_read_cards', JSON.stringify([...readCards]));
         const homeTabs = document.querySelectorAll('#resultsGrid .category-tab');
@@ -472,6 +489,139 @@ function markCardAsReadByElement(el) {
             }
         });
     }
+
+    // 2. 无论是否曾学过，只要点击学习，均计入“今日学习日历”统计
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    const dateStr = `${y}-${m}-${d}`;
+    
+    let dailyData = JSON.parse(localStorage.getItem('catchase_daily_read') || '{}');
+    if (!dailyData[dateStr]) dailyData[dateStr] = [];
+    if (!dailyData[dateStr].includes(cardKey)) {
+        dailyData[dateStr].push(cardKey);
+        localStorage.setItem('catchase_daily_read', JSON.stringify(dailyData));
+        if(typeof renderCalendar === 'function') renderCalendar();
+    }
+}
+
+let currentCalDate = new Date();
+function renderCalendar() {
+    const year = currentCalDate.getFullYear();
+    const month = currentCalDate.getMonth();
+    const calYearEl = document.getElementById('calYear');
+    const calMonthEl = document.getElementById('calMonth');
+    if(!calYearEl || !calMonthEl) return;
+    
+    calYearEl.innerText = year;
+    calMonthEl.innerText = month + 1;
+    
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    
+    const dailyData = JSON.parse(localStorage.getItem('catchase_daily_read') || '{}');
+    const calGrid = document.getElementById('calGrid');
+    calGrid.innerHTML = '';
+    
+    for(let i=0; i<firstDay; i++) {
+        calGrid.innerHTML += `<div></div>`;
+    }
+    
+    const isInk = document.body.classList.contains('ink-mode');
+    const isSepia = document.body.classList.contains('sepia-mode');
+    
+    for(let d=1; d<=daysInMonth; d++) {
+        const dateStr = `${year}-${String(month+1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const count = dailyData[dateStr] ? dailyData[dateStr].length : 0;
+        
+        const cell = document.createElement('div');
+        let bg = 'transparent';
+        let borderColor = 'var(--app-border)';
+        let opacity = '0.4';
+        
+        if (count > 0) {
+            opacity = '1';
+            borderColor = 'var(--app-accent)';
+            if (isInk) { bg = '#e0e0e0'; }
+            else if (isSepia) { bg = 'rgba(141, 110, 99, 0.2)'; }
+            else { bg = 'rgba(0, 255, 65, 0.1)'; }
+        }
+        
+        cell.style.cssText = `background:${bg}; border:1px solid ${borderColor}; opacity:${opacity}; border-radius:6px; padding:6px 0; text-align:center; cursor:pointer; min-height:50px; display:flex; flex-direction:column; justify-content:center; align-items:center; transition:all 0.2s; box-sizing:border-box;`;
+        
+        const countHtml = count > 0 ? `<div style="font-size:11px; color:var(--app-accent); font-weight:bold; margin-top:4px;">${count} 张</div>` : `<div style="font-size:11px; opacity:0.5; margin-top:4px;">-</div>`;
+        
+        cell.innerHTML = `<div style="font-size:14px; font-weight:bold;">${d}</div>${countHtml}`;
+        
+        cell.onclick = () => {
+            if (count > 0) {
+                renderReviewCards(dateStr, dailyData[dateStr]);
+            }
+        };
+        
+        calGrid.appendChild(cell);
+    }
+}
+
+function changeMonth(delta) {
+    if (delta === 0) { currentCalDate = new Date(); }
+    else { currentCalDate.setMonth(currentCalDate.getMonth() + delta); }
+    renderCalendar();
+}
+
+async function renderReviewCards(dateStr, cardKeys) {
+    document.querySelectorAll('.category-tab').forEach(tab => tab.classList.remove('active'));
+    currentCategory = `Review-${dateStr}`;
+    const resultsGrid = document.getElementById('resultsGrid');
+    const stagingArea = document.getElementById('stagingArea');
+    resultsGrid.innerHTML = '';
+    stagingArea.innerHTML = '';
+    
+    const filteredData = allImportedData.filter(d => cardKeys.includes(`${d.c}_${d.theme}`));
+    
+    if (filteredData.length === 0) {
+        alert("找不到该日期的卡片数据，可能已被覆盖或删除。");
+        return;
+    }
+    
+    rawResultsData = filteredData;
+    generatedImagesData = new Array(filteredData.length).fill(null);
+    generatedDOMs = new Array(filteredData.length).fill(null);
+
+    const title = document.createElement('div');
+    title.style.width = '100%';
+    title.style.textAlign = 'center';
+    title.style.margin = '5px 0 15px 0';
+    title.style.fontSize = '16px';
+    title.style.fontWeight = 'bold';
+    title.style.color = 'var(--app-accent)';
+    title.innerHTML = `📚 复习模式：${dateStr} (共 ${filteredData.length} 张)<br><span style="font-size:12px; opacity:0.7; font-weight:normal;">点击上方任意分类退出复习模式</span>`;
+    resultsGrid.appendChild(title);
+
+    filteredData.forEach((data, i) => {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'category-tab is-read';
+        wrapper.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+        wrapper.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+        wrapper.innerText = data.theme;
+        const cardKey = `${data.c}_${data.theme}`;
+        wrapper.setAttribute('data-card-key', cardKey);
+        wrapper.onclick = async () => {
+            if (!generatedDOMs[i]) {
+                const cardDOM = createBaseCardDOM(data);
+                stagingArea.appendChild(cardDOM);
+                await applyAutoFitLogic(cardDOM);
+                drawDynamicTree(cardDOM, data);
+                generatedDOMs[i] = cardDOM.cloneNode(true);
+                const canvas = await html2canvas(cardDOM, { scale: 2, backgroundColor: null });
+                generatedImagesData[i] = { theme: data.theme, dataUrl: canvas.toDataURL('image/png') };
+                cardDOM.remove();
+            }
+            openLightbox(i);
+        };
+        resultsGrid.appendChild(wrapper);
+    });
 }
 
 
@@ -1058,6 +1208,8 @@ function applyThemeToBody() {
     const btn = document.getElementById('themeToggleBtn');
     if(btn) btn.innerText = currentGlobalTheme === 'oled' ? '🌃 深色模式 (绿)' : '📜 棕褐模式 (亮)';
     document.getElementById('inkModeBtn').innerText = isInkMode ? '📖 墨水屏:开' : '📖 墨水屏:关';
+
+    if(typeof renderCalendar === 'function') renderCalendar();
 }
 
 async function initApp() {
@@ -1107,6 +1259,8 @@ async function initApp() {
         const categoryList = Array.from(categories).sort();
         renderCategoryTabs(categoryList);
         if (categoryList.length > 0) await renderCategory(categoryList[0]);
+        
+        if(typeof renderCalendar === 'function') renderCalendar();
 
     } catch (error) {
         console.error('Initialization error:', error);
