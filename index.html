@@ -182,7 +182,7 @@
         .theme-hermes .def-item div { color: rgba(245, 240, 235, 0.8) !important; }
         
         /* 4. 双语句子级点读高亮：爱马仕专属“舞台橙流光”聚焦 */
-        .theme-hermes .active-focus {
+        .theme-hermes .active-focus, .theme-hermes .t-active-focus {
             background-color: rgba(243, 112, 33, 0.2) !important;
             color: #ffffff !important;
             box-shadow: 0 0 20px rgba(243, 112, 33, 0.4) !important;
@@ -470,20 +470,20 @@
             display: inline;
         }
         /* OLED绿模式下的句子高亮：半透明荧光绿底 + 白字加外发光 */
-        .theme-oled .active-focus {
+        .theme-oled .active-focus, .theme-oled .t-active-focus {
             background-color: rgba(0, 255, 65, 0.25) !important;
             color: #ffffff !important;
             box-shadow: 0 0 10px rgba(0, 255, 65, 0.4);
             opacity: 1 !important;
         }
         /* 棕褐阅读模式下的句子高亮：柔和深啡色底 */
-        .theme-sepia .active-focus {
+        .theme-sepia .active-focus, .theme-sepia .t-active-focus {
             background-color: rgba(141, 110, 99, 0.25) !important;
             color: #5b4636 !important;
             opacity: 1 !important;
         }
         /* 墨水屏模式下的句子高亮：反色为纯黑底白字，确保极高对比度 */
-        .theme-ink .active-focus {
+        .theme-ink .active-focus, .theme-ink .t-active-focus {
             background-color: #000000 !important;
             color: #ffffff !important;
             opacity: 1 !important;
@@ -624,7 +624,7 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
 
     </div>
     
-    <input type="text" id="typingHiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position: absolute; top: 0; left: 0; opacity: 0; z-index: -1;">
+    <textarea id="typingHiddenInput" name="blind_typing_area" autocomplete="nope" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" style="position: fixed; top: 50%; left: 50%; width: 1px; height: 1px; opacity: 0.01; z-index: -1; font-size: 16px; border: none; outline: none; resize: none; background: transparent; transform: translate(-50%, -50%);"></textarea>
     
     <style>
         .t-char { color: rgba(128,128,128,0.5); border-bottom: 2px solid transparent; transition: all 0.1s ease; position: relative; }
@@ -2335,7 +2335,7 @@ function retryTyping() {
     typingLastInputLength = 0;
     
     document.querySelectorAll('.t-zh-sentence').forEach(el => {
-        el.classList.remove('active-focus');
+        el.classList.remove('t-active-focus');
         el.style.opacity = '1';
     });
     
@@ -2460,10 +2460,10 @@ function handleTypingInput() {
         currentTypingSentenceIndex = activeSentenceIdx;
         document.querySelectorAll('.t-zh-sentence').forEach((el, idx) => {
             if (idx === activeSentenceIdx) {
-                el.classList.add('active-focus');
+                el.classList.add('t-active-focus');
                 el.style.opacity = '1';
             } else {
-                el.classList.remove('active-focus');
+                el.classList.remove('t-active-focus');
                 el.style.opacity = '0.3';
             }
         });
