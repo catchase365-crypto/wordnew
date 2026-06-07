@@ -2174,6 +2174,38 @@ let isTypingComposing = false;
 let typingCurrentData = null;
 let typingSentenceBounds = [];
 let currentTypingSentenceIndex = -1;
+let typingLastInputLength = 0;
+let errorAudioCtx = null;
+
+function playErrorSound() {
+    try {
+        if (!errorAudioCtx) errorAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (errorAudioCtx.state === 'suspended') errorAudioCtx.resume();
+        const osc = errorAudioCtx.createOscillator();
+        const gain = errorAudioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, errorAudioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, errorAudioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, errorAudioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(errorAudioCtx.destination);
+        osc.start();
+        osc.stop(errorAudioCtx.currentTime + 0.1);
+    } catch(e) {}
+}
+
+function checkAndReadNextWord(index) {
+    if (index >= typingTargetText.length) return;
+    const charAtIdx = typingTargetText[index];
+    const prevChar = index > 0 ? typingTargetText[index - 1] : ' ';
+    if (/[a-zA-Z0-9]/.test(charAtIdx) && !/[a-zA-Z0-9'-]/.test(prevChar)) {
+        let wordEnd = index;
+        while (wordEnd < typingTargetText.length && /[a-zA-Z0-9'-]/.test(typingTargetText[wordEnd])) {
+            wordEnd++;
+        }
+        speakTTS(typingTargetText.substring(index, wordEnd));
+    }
+}
 
 function startTypingMode() {
     if (!allImportedData || allImportedData.length === 0) return alert("数据正在加载，请稍候...");
@@ -2300,6 +2332,7 @@ function retryTyping() {
     typeTimeElapsed = 0;
     isTypingComposing = false;
     currentTypingSentenceIndex = -1;
+    typingLastInputLength = 0;
     
     document.querySelectorAll('.t-zh-sentence').forEach(el => {
         el.classList.remove('active-focus');
@@ -2320,6 +2353,7 @@ function retryTyping() {
     }).join('');
 
     focusTypingInput();
+    setTimeout(() => checkAndReadNextWord(0), 300);
 }
 
 function focusTypingInput() {
@@ -2403,6 +2437,18 @@ function handleTypingInput() {
         hiddenInput.value = currentInput;
         return;
     }
+
+    if (currentInput.length > typingLastInputLength) {
+        const lastTypedIdx = currentInput.length - 1;
+        if (currentInput[lastTypedIdx] !== typingTargetText[lastTypedIdx]) {
+            playErrorSound();
+        } else {
+            checkAndReadNextWord(currentInput.length);
+        }
+    } else if (currentInput.length < typingLastInputLength) {
+        checkAndReadNextWord(currentInput.length);
+    }
+    typingLastInputLength = currentInput.length;
 
     // 实时中英文焦点高亮联动
     const currentPos = currentInput.length;
