@@ -249,7 +249,7 @@
         .theme-ink .def-item div { color: #000000 !important; }
 
         /* 核心适配：禁用苹果 iOS 长按弹出系统选择蓝块、拷贝菜单与放大镜 */
-        [data-word], .word-item, .def-item, mark.hl {
+        [data-word], .word-item, .def-item, mark.hl, #typingLandscapeCard, .t-char, .t-zh-sentence {
             -webkit-touch-callout: none !important;
             -webkit-user-select: none !important;
             user-select: none !important;
@@ -584,7 +584,7 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
 <div id="typingModal" class="lightbox" style="z-index: 3000; display: none; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
     <span class="lightbox-close" onclick="closeTypingMode()" style="border-color: var(--app-border); color: var(--app-text); background: var(--app-bg); font-size: 14px; padding: 6px 16px;">✕ 退出</span>
     
-    <div id="typingLandscapeCard" class="card-container" onclick="focusTypingInput()" style="width: 98vw; max-width: 1800px; height: 96vh; max-height: none; flex-direction: row; gap: 30px; padding: 30px; border-radius: 16px; background: var(--card-bg); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+    <div id="typingLandscapeCard" class="card-container" onclick="focusTypingInput()" oncontextmenu="return false;" style="width: 98vw; max-width: 1800px; height: 96vh; max-height: none; flex-direction: row; gap: 30px; padding: 30px; border-radius: 16px; background: var(--card-bg); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
         
         
         <div style="flex: 3; display: flex; flex-direction: column; gap: 15px; border-right: 1px dashed var(--border-color); padding-right: 20px; overflow-y: auto;">
@@ -2000,8 +2000,11 @@ document.addEventListener('DOMContentLoaded', () => {
 window.addEventListener('focus', () => {
     try {
         window.getSelection().removeAllRanges();
-        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        if (document.activeElement && typeof document.activeElement.blur === 'function' && document.activeElement.id !== 'typingHiddenInput') {
             document.activeElement.blur();
+        }
+        if (document.getElementById('typingModal') && document.getElementById('typingModal').style.display === 'flex') {
+            setTimeout(focusTypingInput, 300);
         }
     } catch(err) {}
 });
@@ -2242,7 +2245,7 @@ function startTypingMode() {
     typingCurrentData.words.forEach((item, i) => {
         const color = HighlighterColors[i % HighlighterColors.length];
         const cleanWord = item.word.replace(/'/g, "\\'");
-        defHTML += `<div class="def-item" style="flex-direction: column; align-items: flex-start; cursor:pointer; width: 100%; box-sizing: border-box;" onclick="speakTTS('${cleanWord}')">
+        defHTML += `<div class="def-item" data-word="${cleanWord}" style="flex-direction: column; align-items: flex-start; cursor:pointer; width: 100%; box-sizing: border-box;" onclick="speakTTS('${cleanWord}')">
             <div style="margin-bottom: 2px;"><mark class="hl" style="background-color: ${color}; font-weight: 600; margin-right: 6px; color: #111;">${item.word}</mark><span style="font-size: 12px; opacity: 0.8;">${item.phonetic || ''}</span></div>
             <div class="zh-def" style="opacity: 0.9; font-size: 13px;">${item.definition}</div>
         </div>`;
@@ -2297,6 +2300,7 @@ function drawTypingTree(data, container) {
         el.style.backgroundColor = color; 
         el.style.cursor = 'pointer';
         el.style.color = '#111';
+        el.setAttribute('data-word', cleanWordAttr);
         el.setAttribute('onclick', `speakTTS('${cleanWordAttr}')`);
         el.innerText = item.word;
         
@@ -2404,12 +2408,130 @@ function closeTypingMode() {
     document.body.style.overflow = 'auto';
 }
 
-// 事件绑定与中文输入法兼容
+// 事件绑定与中文输入法兼容及盲打模式欧路词典长按查词
 document.addEventListener('DOMContentLoaded', () => {
     const hiddenInput = document.getElementById('typingHiddenInput');
     if(hiddenInput) {
         hiddenInput.addEventListener('input', handleTypingInput);
+
+        // --- 新增：Enter 键专属查词拦截 ---
+        hiddenInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // 彻底屏蔽回车键的文字输入
+                if (!typingTargetText) return;
+                
+                let pos = hiddenInput.value.length;
+                let target = typingTargetText;
+                
+                // 从当前光标向右找第一个字母（如果是空格则自动找下一个词）
+                let start = pos;
+                while (start < target.length && !/[a-zA-Z]/.test(target[start])) {
+                    start++;
+                }
+                if (start >= target.length) return;
+                
+                // 向左扩展找词头
+                let left = start;
+                while (left > 0 && /[a-zA-Z0-9'\-]/.test(target[left - 1])) {
+                    left--;
+                }
+                // 向右扩展找词尾
+                let right = start;
+                while (right < target.length && /[a-zA-Z0-9'\-]/.test(target[right])) {
+                    right++;
+                }
+                
+                let word = target.substring(left, right);
+                if (word && window.callEudic) {
+                    window.callEudic(word);
+                    // 尝试延时夺回焦点（受限于安卓系统分屏安全机制，可能无法100%强行夺回）
+                    setTimeout(focusTypingInput, 500);
+                    setTimeout(focusTypingInput, 1500);
+                }
+            }
+        });
     }
+
+    let typingFingerTimer = null;
+    let typingLongPressActive = false;
+    let tStartX = 0, tStartY = 0;
+    let tTargetElement = null;
+
+    const typingCard = document.getElementById('typingLandscapeCard');
+    if (!typingCard) return;
+
+    typingCard.addEventListener('touchstart', (e) => {
+        const clientX = e.touches[0].clientX;
+        const clientY = e.touches[0].clientY;
+        
+        tTargetElement = e.target.closest('[data-word]') || e.target.closest('#typingTextContainer');
+        if (!tTargetElement) return;
+        
+        typingLongPressActive = false;
+        tStartX = clientX;
+        tStartY = clientY;
+        
+        typingFingerTimer = setTimeout(() => {
+            typingLongPressActive = true;
+            let word = "";
+            if (tTargetElement.hasAttribute('data-word')) {
+                word = tTargetElement.getAttribute('data-word');
+            } else if (tTargetElement.id === 'typingTextContainer' || tTargetElement.closest('#typingTextContainer')) {
+                if (e.target.classList.contains('t-char')) {
+                    const spans = Array.from(tTargetElement.closest('#typingTextContainer').children);
+                    const index = spans.indexOf(e.target);
+                    if (index !== -1) {
+                        let left = index;
+                        while(left >= 0 && /[a-zA-Z0-9'\-]/.test(typingTargetText[left])) left--;
+                        let right = index;
+                        while(right < typingTargetText.length && /[a-zA-Z0-9'\-]/.test(typingTargetText[right])) right++;
+                        word = typingTargetText.substring(left + 1, right);
+                    }
+                } else {
+                    word = getWordAtPoint(clientX, clientY, e.target);
+                }
+            }
+            if (word && window.callEudic) {
+                window.getSelection().removeAllRanges();
+                if(document.activeElement && document.activeElement.id !== 'typingHiddenInput') {
+                    document.activeElement.blur();
+                }
+                window.callEudic(word, tTargetElement);
+            }
+        }, 500);
+    }, { passive: true });
+
+    typingCard.addEventListener('touchmove', (e) => {
+        if (!typingFingerTimer) return;
+        const moveX = Math.abs(e.touches[0].clientX - tStartX);
+        const moveY = Math.abs(e.touches[0].clientY - tStartY);
+        if (moveX > 12 || moveY > 12) {
+            clearTimeout(typingFingerTimer);
+            typingFingerTimer = null;
+        }
+    }, { passive: true });
+
+    typingCard.addEventListener('touchend', (e) => {
+        if (typingFingerTimer) {
+            clearTimeout(typingFingerTimer);
+            typingFingerTimer = null;
+        }
+        if (tTargetElement) {
+            if (typingLongPressActive) {
+                e.preventDefault();
+                e.stopPropagation();
+                setTimeout(focusTypingInput, 100);
+            } else {
+                if (tTargetElement.hasAttribute('data-word')) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    tTargetElement.click();
+                    setTimeout(focusTypingInput, 100);
+                }
+            }
+        }
+        tTargetElement = null;
+    }, { passive: false });
 });
 
 function handleTypingInput() {
