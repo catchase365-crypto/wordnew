@@ -597,8 +597,8 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
                 </div>
             </div>
             
-            <div class="top-section" style="flex: 1; display: flex; flex-direction: column; margin-top: 0; box-shadow: none; border: none; background: transparent; padding: 0;">
-                <div id="typingTextContainer" style="font-size: 1.8rem; line-height: 1.6; letter-spacing: 1px; word-break: break-word; font-family: 'Georgia', serif; cursor: text; user-select: none; flex: 1;" onclick="focusTypingInput()">
+            <div class="top-section" style="display: flex; flex-direction: column; margin-top: 0; box-shadow: none; border: none; background: transparent; padding: 0;">
+                <div id="typingTextContainer" style="font-size: 1.8rem; line-height: 1.6; letter-spacing: 1px; word-break: break-word; font-family: 'Georgia', serif; cursor: text; user-select: none; padding-bottom: 20px;" onclick="focusTypingInput()">
                     
                 </div>
                 <div id="typingTranslation" class="zh-translation" style="font-size: 1.1rem; line-height: 1.6; padding-top: 15px; border-top: 1px dashed var(--border-color);">
@@ -624,7 +624,7 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
 
     </div>
     
-    <input type="text" id="typingHiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position: absolute; opacity: 0; z-index: -1;">
+    <input type="text" id="typingHiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position: absolute; top: 0; left: 0; opacity: 0; z-index: -1;">
     
     <style>
         .t-char { color: rgba(128,128,128,0.5); border-bottom: 2px solid transparent; transition: all 0.1s ease; position: relative; }
