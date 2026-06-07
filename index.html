@@ -509,6 +509,7 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center;" onclick="forceSync()">🔄 同步</button>
         <button class="icon-btn" id="syncBtn" style="flex: 1; min-width: 120px; justify-content: center; background: #2196F3 !important; color: white !important; border-color: #0b7dda;" onclick="startAutoSync()">📲 局域网同步</button>
         <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center; background: #e91e63 !important; color: white !important; border-color: #ff4081;" onclick="startRandomMode()">🎲 随机挑战</button>
+        <button class="icon-btn" style="flex: 1; min-width: 120px; justify-content: center; background: #9c27b0 !important; color: white !important; border-color: #ba68c8;" onclick="startTypingMode()">⌨️ 盲打练习</button>
     </div>
 
     <div style="margin-bottom: 12px;">
@@ -577,6 +578,70 @@ window.addEventListener("click", function(){ var d=document.documentElement; (d.
         <button class="icon-btn" style="margin-top: 30px; width: 100%; justify-content: center;" onclick="closeP2PSync()">取消</button>
     </div>
     <style> @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } </style>
+</div>
+
+
+<div id="typingModal" class="lightbox" style="z-index: 3000; display: none; background: rgba(0,0,0,0.9); flex-direction: column; align-items: center; justify-content: center; padding: 10px;">
+    <span class="lightbox-close" onclick="closeTypingMode()" style="border-color: var(--app-border); color: var(--app-text); background: var(--app-bg); font-size: 14px; padding: 6px 16px;">✕ 退出</span>
+    
+    <div id="typingLandscapeCard" class="card-container" onclick="focusTypingInput()" style="width: 98vw; max-width: 1800px; height: 96vh; max-height: none; flex-direction: row; gap: 30px; padding: 30px; border-radius: 16px; background: var(--card-bg); overflow: hidden; box-shadow: 0 20px 50px rgba(0,0,0,0.5);">
+        
+        
+        <div style="flex: 3; display: flex; flex-direction: column; gap: 15px; border-right: 1px dashed var(--border-color); padding-right: 20px; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid var(--border-color); padding-bottom: 10px;">
+                <h2 id="typingTheme" style="color: var(--accent); margin: 0; font-size: 22px;">Theme</h2>
+                <div style="display: flex; gap: 20px; font-size: 1rem; color: var(--text-color);">
+                    <div style="display: flex; flex-direction: column; align-items: center;"><span style="font-size: 0.7rem; opacity: 0.7;">Time</span><span id="typingTimer" style="font-family: monospace; font-size: 1.5rem; font-weight: bold; color: var(--accent);">0s</span></div>
+                    <div style="display: flex; flex-direction: column; align-items: center;"><span style="font-size: 0.7rem; opacity: 0.7;">WPM</span><span id="typingWpm" style="font-family: monospace; font-size: 1.5rem; font-weight: bold; color: var(--text-color);">0</span></div>
+                    <div style="display: flex; flex-direction: column; align-items: center;"><span style="font-size: 0.7rem; opacity: 0.7;">ACC</span><span id="typingAcc" style="font-family: monospace; font-size: 1.5rem; font-weight: bold; color: var(--text-color);">100%</span></div>
+                </div>
+            </div>
+            
+            <div class="top-section" style="flex: 1; display: flex; flex-direction: column; margin-top: 0; box-shadow: none; border: none; background: transparent; padding: 0;">
+                <div id="typingTextContainer" style="font-size: 1.8rem; line-height: 1.6; letter-spacing: 1px; word-break: break-word; font-family: 'Georgia', serif; cursor: text; user-select: none; flex: 1;" onclick="focusTypingInput()">
+                    
+                </div>
+                <div id="typingTranslation" class="zh-translation" style="font-size: 1.1rem; line-height: 1.6; padding-top: 15px; border-top: 1px dashed var(--border-color);">
+                    
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 15px; justify-content: center; margin-top: 10px; flex-shrink: 0;">
+                <button class="icon-btn" onclick="startTypingMode()" style="padding: 10px 20px; font-size: 14px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color);">⏭️ 随机换一篇</button>
+                <button class="icon-btn" onclick="retryTyping()" style="padding: 10px 20px; font-size: 14px; background: transparent; border: 1px solid var(--border-color); color: var(--text-color);">🔄 重新挑战</button>
+            </div>
+        </div>
+
+        
+        <div style="flex: 2.2; display: flex; flex-direction: column; gap: 15px; overflow-y: auto;">
+            <div id="typingTreeContainer" class="middle-tree" style="min-height: 350px; flex: 1.2; border: 1px solid var(--border-color); border-radius: 12px; background: rgba(128,128,128,0.05); position: relative;">
+                
+            </div>
+            <div id="typingDefContainer" class="bottom-section" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; align-content: start; min-height: auto; overflow-y: visible; padding: 10px; background: transparent; border: none; box-shadow: none; flex: 0.8;">
+                
+            </div>
+        </div>
+
+    </div>
+    
+    <input type="text" id="typingHiddenInput" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="position: absolute; opacity: 0; z-index: -1;">
+    
+    <style>
+        .t-char { color: rgba(128,128,128,0.5); border-bottom: 2px solid transparent; transition: all 0.1s ease; position: relative; }
+        .theme-ink .t-char, .theme-sepia .t-char { color: rgba(128,128,128,0.7); }
+        .t-char.t-current { color: var(--text-color); border-bottom-color: var(--accent); animation: t-blink 1s infinite; }
+        .t-char.t-correct { color: var(--accent); }
+        .theme-ink .t-char.t-correct { color: #000; font-weight: bold; }
+        .t-char.t-error { color: #fff; background-color: rgba(255, 51, 51, 0.6); border-radius: 2px; }
+        @keyframes t-blink { 50% { border-bottom-color: transparent; } }
+        
+        /* 针对小屏幕/竖屏时的自适应：切换为垂直布局 */
+        @media (max-width: 900px), (orientation: portrait) {
+            #typingLandscapeCard { flex-direction: column !important; height: 95vh !important; max-height: none !important; overflow-y: auto; }
+            #typingLandscapeCard > div:first-child { border-right: none !important; border-bottom: 1px dashed var(--border-color); padding-right: 0 !important; padding-bottom: 20px; overflow-y: visible; }
+            #typingTreeContainer { min-height: 280px !important; }
+        }
+    </style>
 </div>
 
 <script>
@@ -2098,6 +2163,287 @@ function mergeSyncData(remoteData) {
 }
 
 
+
+// ==================== 融合版横屏打字练习模块 ====================
+// 注：此Diff基于最初始未修改的HTML源文件生成
+let typeTimeElapsed = 0;
+let typeTimer = null;
+let isTypingPlaying = false;
+let typingTargetText = "";
+let isTypingComposing = false;
+let typingCurrentData = null;
+let typingSentenceBounds = [];
+let currentTypingSentenceIndex = -1;
+
+function startTypingMode() {
+    if (!allImportedData || allImportedData.length === 0) return alert("数据正在加载，请稍候...");
+    
+    typingCurrentData = allImportedData[Math.floor(Math.random() * allImportedData.length)];
+    
+    // 提取纯文本（保留原始标点以供打字练习）
+    const rawEn = typingCurrentData.paragraph_en.replace(/<[^>]*>?/gm, '').replace(/[“”]/g, '"').replace(/[‘’]/g, "'").replace(/[\n\r]+/g, ' ').replace(/\s+/g, ' ').trim();
+    typingTargetText = rawEn;
+    
+    // 计算中英文句子边界映射
+    const enSentences = rawEn.match(/[^.?!]+[.?!]*/g) || [rawEn];
+    const zhSentences = typingCurrentData.paragraph_zh.match(/[^。！？]+[。！？]*/g) || [typingCurrentData.paragraph_zh];
+    typingSentenceBounds = [];
+    let currentIndex = 0;
+    enSentences.forEach(s => {
+        const len = s.length;
+        typingSentenceBounds.push({ start: currentIndex, end: currentIndex + len - 1 });
+        currentIndex += len;
+    });
+    currentTypingSentenceIndex = -1;
+
+    // 填充UI与基础信息
+    document.getElementById('typingTheme').innerText = `🎯 ${typingCurrentData.theme}`;
+    
+    let zhHTML = '<b style="margin-right: 8px;">翻译：</b>';
+    zhSentences.forEach((sentence, idx) => {
+        zhHTML += `<span class="t-zh-sentence" style="transition: all 0.3s; border-radius: 4px; padding: 2px; display: inline;">${sentence}</span>`;
+    });
+    document.getElementById('typingTranslation').innerHTML = zhHTML;
+    
+    // 生成右侧释义列表 (改为网格两列自适应)
+    let defHTML = '';
+    typingCurrentData.words.forEach((item, i) => {
+        const color = HighlighterColors[i % HighlighterColors.length];
+        const cleanWord = item.word.replace(/'/g, "\\'");
+        defHTML += `<div class="def-item" style="flex-direction: column; align-items: flex-start; cursor:pointer; width: 100%; box-sizing: border-box;" onclick="speakTTS('${cleanWord}')">
+            <div style="margin-bottom: 2px;"><mark class="hl" style="background-color: ${color}; font-weight: 600; margin-right: 6px; color: #111;">${item.word}</mark><span style="font-size: 12px; opacity: 0.8;">${item.phonetic || ''}</span></div>
+            <div class="zh-def" style="opacity: 0.9; font-size: 13px;">${item.definition}</div>
+        </div>`;
+    });
+    document.getElementById('typingDefContainer').innerHTML = defHTML;
+
+    // 绘制右侧动态单词树
+    const treeContainer = document.getElementById('typingTreeContainer');
+    treeContainer.innerHTML = '';
+    // 使用 requestAnimationFrame 确保容器尺寸已渲染后再画树
+    document.getElementById('typingModal').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+    
+    // 同步卡片主题全局色系
+    const cardEl = document.getElementById('typingLandscapeCard');
+    cardEl.className = `card-container theme-${isInkMode ? 'ink' : currentGlobalTheme}`;
+    
+    setTimeout(() => {
+        drawTypingTree(typingCurrentData, treeContainer);
+    }, 50);
+
+    retryTyping();
+}
+
+// 独立的树绘制逻辑，适配横屏右侧区域
+function drawTypingTree(data, container) {
+    const midWidth = container.offsetWidth;
+    const midHeight = container.offsetHeight;
+    const centerX = midWidth / 2;
+    const centerY = midHeight / 2;
+    const radius = Math.min(Math.min(midWidth, midHeight) / 2 - 40, 240); // 限制树的最大半径避免溢出
+
+    const center = document.createElement('div');
+    center.className = 'center-word';
+    center.innerText = `${data.pos || ''}. ${data.theme}`;
+    center.style.left = `${centerX}px`;
+    center.style.top = `${centerY}px`;
+    center.style.transform = `translate(-50%, -50%)`;
+    container.appendChild(center);
+
+    data.words.forEach((item, i) => {
+        const color = HighlighterColors[i % HighlighterColors.length];
+        const angleDeg = (i * (360 / data.words.length)) - 90;
+        const angleRad = angleDeg * (Math.PI / 180);
+        
+        const x = centerX + Math.cos(angleRad) * radius;
+        const y = centerY + Math.sin(angleRad) * radius;
+
+        const el = document.createElement('div');
+        const cleanWordAttr = item.word.replace(/'/g, "\\'");
+        el.className = 'word-item';
+        el.style.backgroundColor = color; 
+        el.style.cursor = 'pointer';
+        el.style.color = '#111';
+        el.setAttribute('onclick', `speakTTS('${cleanWordAttr}')`);
+        el.innerText = item.word;
+        
+        const cos = Math.cos(angleRad);
+        const sin = Math.sin(angleRad);
+        
+        let tx = -50;
+        if (cos > 0.3) tx = 0; else if (cos < -0.3) tx = -100;
+        let ty = -50;
+        if (sin > 0.7) ty = 0; else if (sin < -0.7) ty = -100;
+
+        el.style.left = `${x}px`;
+        el.style.top = `${y}px`;
+        el.style.transform = `translate(${tx}%, ${ty}%)`;
+        container.appendChild(el);
+
+        const line = document.createElement('div');
+        line.className = 'line';
+        line.style.backgroundColor = color; 
+        line.style.left = `${centerX}px`;
+        line.style.top = `${centerY}px`;
+        const lineLength = radius - 30;
+        line.style.width = `${lineLength}px`;
+        line.style.transform = `rotate(${angleDeg}deg) translate(30px, 0)`; 
+        container.appendChild(line);
+    });
+}
+
+function retryTyping() {
+    clearInterval(typeTimer);
+    typeTimer = null;
+    isTypingPlaying = false;
+    typeTimeElapsed = 0;
+    isTypingComposing = false;
+    currentTypingSentenceIndex = -1;
+    
+    document.querySelectorAll('.t-zh-sentence').forEach(el => {
+        el.classList.remove('active-focus');
+        el.style.opacity = '1';
+    });
+    
+    document.getElementById('typingTimer').innerText = `${typeTimeElapsed}s`;
+    document.getElementById('typingWpm').innerText = '0';
+    document.getElementById('typingAcc').innerText = '100%';
+    
+    const input = document.getElementById('typingHiddenInput');
+    input.value = '';
+    
+    const container = document.getElementById('typingTextContainer');
+    // 高亮当前输入的词，保留整体句子结构
+    container.innerHTML = typingTargetText.split('').map((char, index) => {
+        return `<span class="t-char ${index === 0 ? 't-current' : ''}">${char}</span>`;
+    }).join('');
+
+    focusTypingInput();
+}
+
+function focusTypingInput() {
+    const input = document.getElementById('typingHiddenInput');
+    setTimeout(() => { input.focus(); }, 100);
+}
+
+function startTypingTimer() {
+    isTypingPlaying = true;
+    typeTimer = setInterval(() => {
+        typeTimeElapsed++;
+        document.getElementById('typingTimer').innerText = `${typeTimeElapsed}s`;
+        updateTypingStats();
+    }, 1000);
+}
+
+function updateTypingStats() {
+    const timeElapsed = typeTimeElapsed;
+    if (timeElapsed <= 0) return;
+
+    const spans = document.querySelectorAll('#typingTextContainer .t-char');
+    let correctCount = 0;
+    let errorCount = 0;
+
+    spans.forEach(span => {
+        if (span.classList.contains('t-correct')) correctCount++;
+        if (span.classList.contains('t-error')) errorCount++;
+    });
+
+    const wpm = Math.round((correctCount / 5) / (timeElapsed / 60));
+    document.getElementById('typingWpm').innerText = isNaN(wpm) || !isFinite(wpm) || wpm < 0 ? 0 : wpm;
+
+    const totalTyped = correctCount + errorCount;
+    const accuracy = totalTyped === 0 ? 100 : Math.round((correctCount / totalTyped) * 100);
+    document.getElementById('typingAcc').innerText = `${accuracy}%`;
+}
+
+function endTyping() {
+    clearInterval(typeTimer);
+    isTypingPlaying = false;
+    document.getElementById('typingHiddenInput').blur();
+    updateTypingStats();
+}
+
+function closeTypingMode() {
+    clearInterval(typeTimer);
+    document.getElementById('typingModal').style.display = 'none';
+    document.body.style.overflow = 'auto';
+}
+
+// 事件绑定与中文输入法兼容
+document.addEventListener('DOMContentLoaded', () => {
+    const hiddenInput = document.getElementById('typingHiddenInput');
+    if(hiddenInput) {
+        hiddenInput.addEventListener('input', handleTypingInput);
+    }
+});
+
+function handleTypingInput() {
+    const hiddenInput = document.getElementById('typingHiddenInput');
+    if (!isTypingPlaying) {
+        startTypingTimer();
+    }
+
+    let currentInput = hiddenInput.value
+        .replace(/，/g, ',')
+        .replace(/。/g, '.')
+        .replace(/！/g, '!')
+        .replace(/？/g, '?')
+        .replace(/（/g, '(')
+        .replace(/）/g, ')')
+        .replace(/“|”/g, '"')
+        .replace(/‘|’/g, "'")
+        .replace(/；/g, ';')
+        .replace(/：/g, ':');
+
+    const spans = document.querySelectorAll('#typingTextContainer .t-char');
+    
+    if (currentInput.length > typingTargetText.length) {
+        currentInput = currentInput.substring(0, typingTargetText.length);
+        hiddenInput.value = currentInput;
+        return;
+    }
+
+    // 实时中英文焦点高亮联动
+    const currentPos = currentInput.length;
+    let activeSentenceIdx = typingSentenceBounds.findIndex(b => currentPos >= b.start && currentPos <= b.end);
+    if (activeSentenceIdx === -1 && currentPos >= typingTargetText.length) activeSentenceIdx = typingSentenceBounds.length - 1;
+    if (activeSentenceIdx === -1 && typingSentenceBounds.length > 0) activeSentenceIdx = 0;
+    
+    if (activeSentenceIdx !== currentTypingSentenceIndex) {
+        currentTypingSentenceIndex = activeSentenceIdx;
+        document.querySelectorAll('.t-zh-sentence').forEach((el, idx) => {
+            if (idx === activeSentenceIdx) {
+                el.classList.add('active-focus');
+                el.style.opacity = '1';
+            } else {
+                el.classList.remove('active-focus');
+                el.style.opacity = '0.3';
+            }
+        });
+    }
+
+    spans.forEach((span, index) => {
+        const charTyped = currentInput[index];
+        span.classList.remove('t-current', 't-correct', 't-error');
+
+        if (charTyped == null) {
+            if (index === currentInput.length) span.classList.add('t-current');
+        } else {
+            if (charTyped === typingTargetText[index]) {
+                span.classList.add('t-correct');
+            } else {
+                span.classList.add('t-error');
+            }
+        }
+    });
+
+    updateTypingStats();
+
+    if (currentInput.length === typingTargetText.length) {
+        endTyping();
+    }
+}
 </script>
 </body>
 </html>
