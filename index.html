@@ -901,8 +901,17 @@ window.callEudic = function(word, el) {
     
     const isPC = !('ontouchstart' in window) && window.matchMedia('(pointer: fine)').matches;
     if (isPC) {
-        // 电脑端右键点击单词列表项时，执行朗读而非唤起词典
+        // Mac/PC端盲打：静默复制触发“剪贴板取词”悬浮窗，并利用 iframe 更新分屏欧路
+        try { navigator.clipboard.writeText(word); } catch(err) {}
         speakTTS(word);
+        let iframe = document.getElementById('eudic-trigger-iframe');
+        if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'eudic-trigger-iframe';
+            iframe.style.display = 'none';
+            document.body.appendChild(iframe);
+        }
+        iframe.src = url;
         return;
     }
 
